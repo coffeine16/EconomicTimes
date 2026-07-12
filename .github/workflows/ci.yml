@@ -1,0 +1,43 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ingestion: ${{ steps.f.outputs.ingestion }}
+      intelligence: ${{ steps.f.outputs.intelligence }}
+      app: ${{ steps.f.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            ingestion: ['ingestion/**', 'shared/**']
+            intelligence: ['intelligence/**', 'shared/**']
+            app: ['app/**', 'shared/**']
+  pipeline-smoke:
+    needs: changes
+    if: needs.changes.outputs.ingestion == 'true' || needs.changes.outputs.intelligence == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. python scripts/run_pipeline.py --synthetic
+      - run: PYTHONPATH=. python intelligence/agents/detect.py
+      - run: PYTHONPATH=. python intelligence/agents/attribution.py
+      - run: PYTHONPATH=. python scripts/eval_attribution.py
+  app-smoke:
+    needs: changes
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: pip install -r requirements.txt
+      - run: PYTHONPATH=. python -c "from app.backend.main import app; print('app imports ok')"
