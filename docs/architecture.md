@@ -106,8 +106,9 @@ Note the trap this rule is built to avoid: an OSM-proximity test *alone* would m
 | observable sources found **and correctly named** | **4/4** |
 | ...that appear on **no map at all** | **2/2** |
 | enforceable-**zone** precision (each zone = one inspector dispatched) | **4/4** |
-| attribution accuracy | 92% (100% on unregistered) |
-| fusion LOSO R² (exposure, not detection) | 0.90 |
+| attribution accuracy | 89% (48/54; 100% on unregistered) |
+| precision at confidence ≥ 0.70 | 100% (17/17) |
+| fusion LOSO R² (exposure, not detection) | 0.898 |
 
 ⚠️ **State 4/4 honestly.** It is n=4 — four detectable sources, four zones — not a robust rate, and by our own Principle 8 a number that comes back at 100% deserves suspicion before applause. The conservative companion is **cell-level precision 71%**; its shortfall is *plume extent inside correctly-found zones* (the failing cells sit inside the zone of the very source that produced them), not false accusations. A 1.6 km satellite footprint plus advection means a real source **necessarily** lights up a 2–3 km blob. Quote both.
 

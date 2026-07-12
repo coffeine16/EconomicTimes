@@ -112,8 +112,9 @@ leakage before you assume success.
     including **2/2 that appear on no map at all**
   - enforceable-**zone** precision **4/4** (74 cells -> 5 zones; the 5th is a
     1-cell diffuse zone, correctly excluded from the enforcement queue)
-  - attribution accuracy **92%** (100% on unregistered); precision **100%** at
-    confidence >= 0.70; fusion LOSO R2 **0.90**, RMSE 6.4 vs naive 9.97
+  - attribution accuracy **89%** (48/54; **100%** on unregistered); precision
+    **100%** at confidence >= 0.70 (17/17); confidence separates hits 0.67 from
+    misses 0.38; fusion LOSO R2 **0.898**, RMSE 6.4 vs naive 9.97 (~36% better)
   - ⚠️ 4/4 is **n=4**. Per "the 100% trap" below, never sell it as a robust rate.
     The conservative companion is cell-level precision **71%**, whose shortfall is
     *plume extent inside correctly-found zones* (a 1.6 km satellite footprint plus
