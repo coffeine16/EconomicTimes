@@ -225,7 +225,13 @@ WINDOW_HOURS = {"chronic": 24 * 30, "emerging": 24 * 7, "acute": 6}
 
 
 def run(top_n: int = 100) -> list[dict]:
-    hotspots = json.loads((DATA_OUT / "hotspots.json").read_text())[:top_n]
+    all_hot = json.loads((DATA_OUT / "hotspots.json").read_text())
+    # Only ENFORCEABLE hotspots get a case built. A diffuse urban-background zone
+    # is real pollution with nobody to serve a notice on: it stays on the map and
+    # feeds ward advisories, but naming a "primary source" for it would be
+    # inventing a culprit. Policy target, not inspection target.
+    hotspots = [h for h in all_hot if h.get("attributable", True)][:top_n]
+    n_diffuse = len(all_hot) - len([h for h in all_hot if h.get("attributable", True)])
     panel = pd.read_parquet(DATA_OUT / "panel.parquet")
     field = pd.read_parquet(DATA_OUT / "fusion_field.parquet")
     osm = pd.read_parquet(DATA_RAW / "osm.parquet")
@@ -259,13 +265,18 @@ def run(top_n: int = 100) -> list[dict]:
                             wind_hist=w.wind_from_deg.tolist())
         ev["hotspot_kind"] = kind
         ev["evidence_window_hours"] = WINDOW_HOURS[kind]
-        out.append(attribute_one(ev))
+        rec = attribute_one(ev)
+        rec["zone_id"] = h.get("zone_id")
+        out.append(rec)
 
     (DATA_OUT / "attributions.json").write_text(json.dumps(out, indent=2))
     if out:
         by_src = pd.Series([o["primary_source"] for o in out]).value_counts().to_dict()
         prov = pd.Series([o["explained_by"] for o in out]).value_counts().to_dict()
-        print(f"[attribute] {len(out)} hotspots attributed {by_src} (explained by {prov})")
+        print(f"[attribute] {len(out)} enforceable hotspots attributed {by_src} "
+              f"(explained by {prov})")
+    print(f"[attribute] {n_diffuse} diffuse urban-background hotspots left unattributed "
+          f"(no locatable source — policy target, not an inspection)")
     return out
 
 

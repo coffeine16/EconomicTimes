@@ -89,7 +89,29 @@ Detection runs on the two instruments with **genuinely uniform coverage** — ev
 | `emerging` | elevated over 7 d, not 30 d | newly commissioned — act now |
 | `acute` | elevated in 24 h only | a fire — send a truck, not a notice |
 
-**Measured on the synthetic world** (`scripts/eval_detection.py`): **4/4** physically observable sources found and correctly named, including **2/2 that appear on no map at all**; precision 76%; and the coverage-bias number — **0 of 9 sources sit within 2 km of a monitor**, so a station-only dashboard sees none of them.
+### Zones, and the enforceable/diffuse split
+
+Two refinements make the output *dispatchable* rather than merely correct.
+
+**Cells are clustered into zones.** Persistence is a property of a **source**, not of a cell: a chronic source's fringe cells only go hot when the wind points at them, so over 30 days they look intermittent and would classify as `emerging` — telling an inspector to go find a newly commissioned facility that does not exist. (Measured: the only `emerging` and `acute` flags in one run were both fringe cells 2.0 km from the chronic landfill.) Hotspot cells within 2 km are therefore connected into a zone, and every cell inherits its zone's most persistent verdict. An inspector is dispatched to a zone, not to a 460 m hexagon.
+
+**Every zone is tagged `attributable`.** The question is not "is this polluted" but "is there anyone to serve a notice on". A zone is enforceable only if some instrument points at a *place*: a named OSM candidate within 3 km, FIRMS fire persistence, or an SO₂/aerosol-index contrast (point-source tracers). A zone that is high only in NO₂ over a dense road network is **diffuse urban background** — real pollution with no single actor responsible. It stays on the map and feeds ward advisories, but it is a **policy target, not an inspection**, and it is excluded from the enforcement queue.
+
+Note the trap this rule is built to avoid: an OSM-proximity test *alone* would mark the landfill and the kiln as diffuse, because they appear on no map — which is precisely what makes finding them valuable. Fire evidence is what localises them.
+
+**Measured on the synthetic world** (`scripts/eval_detection.py`):
+
+| metric | result |
+|---|---|
+| observable sources found **and correctly named** | **4/4** |
+| ...that appear on **no map at all** | **2/2** |
+| enforceable-**zone** precision (each zone = one inspector dispatched) | **4/4** |
+| attribution accuracy | 92% (100% on unregistered) |
+| **sources within 2 km of a monitor** | **0 of 9** |
+
+That last row is the coverage-bias number: a station-only dashboard sees **none** of these.
+
+⚠️ **State 4/4 honestly.** It is n=4 — four detectable sources, four zones — not a robust rate, and by our own Principle 8 a number that comes back at 100% deserves suspicion before applause. The conservative companion number is **cell-level precision 77%**; its shortfall is *plume extent inside correctly-found zones* (the failing cells are a median 2.5 km from the source that produced them, and sit inside that source's own zone), not false accusations. A 1.6 km satellite footprint plus advection means a real source **necessarily** lights up a 2–3 km blob. Quote both numbers.
 
 ### Known blind spots (stated, not hidden)
 

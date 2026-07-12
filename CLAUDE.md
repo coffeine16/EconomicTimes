@@ -56,7 +56,8 @@ for *why* things are shaped the way they are.
 ```bash
 pip install -r requirements.txt
 $env:PYTHONPATH = "."                                    # PowerShell
-python scripts/run_pipeline.py --synthetic               # ingest -> panel -> fusion + LOSO
+python scripts/run_pipeline.py --synthetic --full        # ingest -> panel -> fusion -> detect -> attribute
+python scripts/run_pipeline.py --synthetic               # fusion stage only (leaves hotspots.json STALE)
 python intelligence/agents/detect.py                     # satellite+fire zone detection
 python intelligence/agents/attribution.py                # source attribution
 python scripts/eval_detection.py                         # THE headline stat (recall/precision vs truth)
@@ -99,12 +100,23 @@ leakage before you assume success.
   chronic / emerging / acute.
 - ✅ Attribution: deterministic category scores, LLM explains only, rule
   fallback. Confidence now discriminates (hits 0.66 / misses 0.42).
+- ✅ Zones + enforceable/diffuse split (`detect.py`). Hotspot CELLS are clustered
+  into source ZONES (an inspector is dispatched to a zone, not a 460 m hexagon),
+  and each zone is tagged `attributable`: does any instrument point at a *place*
+  (OSM candidate <3 km, FIRMS fire, or SO2/AAI point-tracer contrast)? A cell that
+  is only high in NO2 over dense roads is **diffuse urban background** — real
+  pollution, no one to serve a notice on, a policy target. It stays on the map and
+  is excluded from the enforcement queue.
 - 📊 Headline numbers (synthetic, `scripts/eval_detection.py`):
   - **4/4** physically observable sources detected and correctly named,
     including **2/2 that appear on no map at all**
-  - detection precision **76%**; attribution accuracy **92%** (100% on
-    unregistered sources); precision **100%** at confidence >= 0.70
+  - enforceable-**zone** precision **4/4**; attribution accuracy **92%** (100% on
+    unregistered); precision **100%** at confidence >= 0.70
   - **0 of 9** sources sit within 2 km of a monitor — the coverage-bias number
+  - ⚠️ 4/4 is **n=4**. Per "the 100% trap" below, do not sell it as a robust rate.
+    The conservative companion is cell-level precision **77%**, whose shortfall is
+    *plume extent inside correctly-found zones* (median 2.5 km from the source that
+    produced it), not false accusations. Quote both.
 - ⚠️ **Known blind spots, stated not hidden:** construction dust (coarse PM, no
   satellite tracer, doesn't burn) recall **0/3**; traffic corridors (NO2
   confounded with the diffuse urban road network) recall **0/2**. Closing these
@@ -129,6 +141,14 @@ leakage before you assume success.
   `docs:`, `ci:`) with a body explaining *why*, not just *what*.
 
 ## Known gotchas
+- **Persistence is a property of a SOURCE, not of a cell.** A chronic source's
+  fringe cells only go hot when the wind points at them, so over 30 days they look
+  intermittent and classify as `emerging` — which would send an inspector hunting
+  for a newly commissioned facility that does not exist. (Measured: the lone
+  `emerging` and `acute` flags in one run were both fringe cells 2.0 km from the
+  chronic landfill.) `detect.py::_reconcile_zones` clusters cells within 2 km and
+  makes every cell inherit its zone's most persistent verdict. Do not classify
+  cells independently.
 - Windows PowerShell: use `$env:PYTHONPATH = "."` not `PYTHONPATH=. cmd`, and
   `Remove-Item -Recurse -Force` not `rm -rf`.
 - `fusion.py` LOSO retrains 12 LightGBM models (one per held-out station).
