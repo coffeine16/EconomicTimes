@@ -107,16 +107,30 @@ leakage before you assume success.
   is only high in NO2 over dense roads is **diffuse urban background** — real
   pollution, no one to serve a notice on, a policy target. It stays on the map and
   is excluded from the enforcement queue.
-- 📊 Headline numbers (synthetic, `scripts/eval_detection.py`):
+- 📊 Headline numbers (synthetic, anchored world — reproducible run to run):
   - **4/4** physically observable sources detected and correctly named,
     including **2/2 that appear on no map at all**
-  - enforceable-**zone** precision **4/4**; attribution accuracy **92%** (100% on
-    unregistered); precision **100%** at confidence >= 0.70
-  - **0 of 9** sources sit within 2 km of a monitor — the coverage-bias number
-  - ⚠️ 4/4 is **n=4**. Per "the 100% trap" below, do not sell it as a robust rate.
-    The conservative companion is cell-level precision **77%**, whose shortfall is
-    *plume extent inside correctly-found zones* (median 2.5 km from the source that
-    produced it), not false accusations. Quote both.
+  - enforceable-**zone** precision **4/4** (74 cells -> 5 zones; the 5th is a
+    1-cell diffuse zone, correctly excluded from the enforcement queue)
+  - attribution accuracy **92%** (100% on unregistered); precision **100%** at
+    confidence >= 0.70; fusion LOSO R2 **0.90**, RMSE 6.4 vs naive 9.97
+  - ⚠️ 4/4 is **n=4**. Per "the 100% trap" below, never sell it as a robust rate.
+    The conservative companion is cell-level precision **71%**, whose shortfall is
+    *plume extent inside correctly-found zones* (a 1.6 km satellite footprint plus
+    advection means a real source necessarily lights a 2-3 km blob), not false
+    accusations. Quote both.
+  - 🚩 **"0 of 9 sources within 2 km of a monitor" is NOT a finding.** It is an
+    assumption: `pick_station_cells` excludes each source's k=2 ring (floor
+    ~1.9-2.4 km), so it is true ~99% of the time by construction. Reporting it as
+    a measurement is the same sin as the 100% trap. The *empirical* version, which
+    owes nothing to our placement rule: **an unbiased, uniformly random 12-monitor
+    network catches a median of 1 of 9 sources — it misses 8 of 9**
+    (`scripts/eval_station_sensitivity.py`). Sparsity misses sources before bias
+    even gets a turn. Quote that instead.
+  - ✅ Detection recall is **invariant to station siting** (4/4 at exclusion k=2,
+    1, and 0) because it reads satellite + FIRMS and never touches a station.
+    Fusion LOSO *does* move with siting (0.90 -> 0.72), as it must. That contrast
+    is the proof the headline isn't an artefact of a rule we invented.
 - ⚠️ **Known blind spots, stated not hidden:** construction dust (coarse PM, no
   satellite tracer, doesn't burn) recall **0/3**; traffic corridors (NO2
   confounded with the diffuse urban road network) recall **0/2**. Closing these
@@ -141,6 +155,19 @@ leakage before you assume success.
   `docs:`, `ci:`) with a body explaining *why*, not just *what*.
 
 ## Known gotchas
+- **The synthetic world is anchored to `config.SYNTHETIC_ANCHOR`, not to now.**
+  It used to end at `utcnow()`, so the same code gave 72 hotspot cells at 22:00
+  and 93 at 02:00 and every reported number silently meant "as measured last
+  Tuesday". Do not reintroduce a wall-clock anchor; a synthetic world exists to be
+  reproducible. Live mode uses real collector timestamps and is unaffected.
+- **`ingestion/synthetic.py::RNG` is module-level and stateful.** `generate_all()`
+  calls `_reset_rng()` first, so the world is a pure function of `WORLD_SEED`.
+  Without it, calling `generate_all()` twice in one process yields two different
+  worlds — which silently broke the station-siting sweep.
+- **Never bind a tunable as a default argument** (`def f(k=SOME_GLOBAL)`). Python
+  binds it once at definition, so `module.SOME_GLOBAL = 0` never reaches it. This
+  made the station-sensitivity sweep test k=2 three times and report "recall is
+  invariant" while measuring nothing. Read the global at call time.
 - **Persistence is a property of a SOURCE, not of a cell.** A chronic source's
   fringe cells only go hot when the wind points at them, so over 30 days they look
   intermittent and classify as `emerging` — which would send an inspector hunting

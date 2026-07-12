@@ -37,10 +37,25 @@ from functools import lru_cache
 import numpy as np
 import pandas as pd
 
-from shared.config import BBOX, PANEL_HOURS, SAT_BLUR_SIGMA_KM
+from shared.config import BBOX, PANEL_HOURS, SAT_BLUR_SIGMA_KM, SYNTHETIC_ANCHOR
 from shared.grid import city_cells, cell_center, bearing_deg
 
-RNG = np.random.default_rng(42)
+WORLD_SEED = 42
+RNG = np.random.default_rng(WORLD_SEED)
+
+
+def _reset_rng() -> None:
+    """Rewind the world's RNG.
+
+    RNG is module-level and STATEFUL: generate_all() draws from it, so calling it
+    twice in one process silently produces two different worlds. A single pipeline
+    run never noticed (it generates once), but any script that regenerates — the
+    station-siting sensitivity sweep, for one — would drift, and leave data/ in a
+    state no fresh run reproduces. Every entry point into world generation rewinds
+    first, so the world is a pure function of WORLD_SEED.
+    """
+    global RNG
+    RNG = np.random.default_rng(WORLD_SEED)
 
 # ---- Hidden sources ----
 # (name, type, lat, lon, strength, active_hours, registered, live_from)
@@ -83,9 +98,36 @@ URBAN_NO2 = 25.0        # the road network is a NO2 tracer -> the satellite can 
 N_ROAD_NODES = 220      # OSM road density, sampled proportional to urban intensity
 URBAN_SEED = 11
 
+# Station siting. CPCB norms deliberately place monitors away from immediate
+# sources, and we reproduce that by excluding the source cell + its k-ring.
+#
+# THIS IS AN ASSUMPTION OF THE WORLD MODEL, NOT A FINDING. At k=2 the effective
+# exclusion floor is ~1.9-2.4 km, so the statement "no source is within 2 km of a
+# monitor" is true ~99% of the time BY CONSTRUCTION (only 1 of 1039 candidate
+# cells survives inside 2 km; P(a station lands there) = 1.1%). Report it as the
+# modelling assumption it is — grounded in real CPCB siting norms — and never as
+# something the pipeline discovered. See scripts/eval_coverage_bias.py for the
+# genuinely empirical version of this claim, measured on real monitors and real
+# OSM industry.
+#
+# Detection does NOT depend on this: it runs on satellite + FIRMS and never reads
+# a station. Set STATION_EXCLUSION_K = 0 and recall is unchanged.
+STATION_EXCLUSION_K = 2
+
 
 def hours_index(n_hours: int = PANEL_HOURS) -> pd.DatetimeIndex:
-    end = pd.Timestamp.utcnow().floor("h")
+    """The world's 60-day window, ending at a FIXED anchor.
+
+    This used to end at `Timestamp.utcnow()`, which meant the whole world — and
+    the hour detection runs at — slid with the wall clock. Run the identical code
+    twice four hours apart and you get different wind, different fires, different
+    hotspots: 72 cells at 22:00, 93 at 02:00, with no code change. Every number we
+    report would have a silent "as measured at 10pm last Tuesday" attached to it.
+
+    A synthetic world exists to be reproducible. Anchor it. Live mode uses real
+    timestamps from the real collectors and is unaffected.
+    """
+    end = pd.Timestamp(SYNTHETIC_ANCHOR, tz="UTC").floor("h")
     return pd.date_range(end - pd.Timedelta(hours=n_hours - 1), end, freq="h")
 
 
@@ -237,16 +279,29 @@ def _blur_matrix(cells: list[str]) -> np.ndarray:
     return w / w.sum(axis=1, keepdims=True)
 
 
-def pick_station_cells(n: int = 12) -> list[str]:
-    """Stations deliberately NOT at the worst source cells (mimics CPCB siting bias)."""
+def pick_station_cells(n: int = 12, exclusion_k: int | None = None) -> list[str]:
+    """Stations deliberately NOT at the source cells (mimics CPCB siting bias).
+
+    `exclusion_k` is exposed so the assumption can be TESTED rather than trusted:
+    set it to 0 and stations may land on top of sources. Detection recall is
+    invariant to it (satellite + FIRMS never read a station); only the fusion
+    field changes. See scripts/eval_station_sensitivity.py.
+    """
+    # Read the module global at CALL time, not as a default argument: a default is
+    # bound when the function is defined, so `synth.STATION_EXCLUSION_K = 0` would
+    # never reach it and the sensitivity sweep would silently test nothing.
+    k = STATION_EXCLUSION_K if exclusion_k is None else exclusion_k
     rng = np.random.default_rng(STATION_SEED)
     cells = city_cells()
-    src_cells = set()
-    from shared.grid import latlng_to_cell, neighbors
-    for _, _, slat, slon, _, _, _, _ in SOURCES:
-        c0 = latlng_to_cell(slat, slon)
-        src_cells |= {c0, *neighbors(c0, 2)}
-    candidates = [c for c in cells if c not in src_cells]
+    if k <= 0:
+        candidates = cells                     # monitors may land anywhere, even on a source
+    else:
+        from shared.grid import latlng_to_cell, neighbors
+        src_cells = set()
+        for _, _, slat, slon, _, _, _, _ in SOURCES:
+            c0 = latlng_to_cell(slat, slon)
+            src_cells |= {c0, *neighbors(c0, k)}
+        candidates = [c for c in cells if c not in src_cells]
     return sorted(rng.choice(candidates, size=n, replace=False).tolist())
 
 
@@ -297,6 +352,7 @@ def _osm_layer() -> pd.DataFrame:
 
 def generate_all(n_hours: int = PANEL_HOURS):
     """Emit synthetic versions of every raw source, matching real ingestor schemas."""
+    _reset_rng()          # the world must be a pure function of WORLD_SEED
     truth, wx = truth_field(n_hours)
     cells = city_cells()
     stations = pick_station_cells()

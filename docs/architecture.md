@@ -107,11 +107,25 @@ Note the trap this rule is built to avoid: an OSM-proximity test *alone* would m
 | ...that appear on **no map at all** | **2/2** |
 | enforceable-**zone** precision (each zone = one inspector dispatched) | **4/4** |
 | attribution accuracy | 92% (100% on unregistered) |
-| **sources within 2 km of a monitor** | **0 of 9** |
+| fusion LOSO R² (exposure, not detection) | 0.90 |
 
-That last row is the coverage-bias number: a station-only dashboard sees **none** of these.
+⚠️ **State 4/4 honestly.** It is n=4 — four detectable sources, four zones — not a robust rate, and by our own Principle 8 a number that comes back at 100% deserves suspicion before applause. The conservative companion is **cell-level precision 71%**; its shortfall is *plume extent inside correctly-found zones* (the failing cells sit inside the zone of the very source that produced them), not false accusations. A 1.6 km satellite footprint plus advection means a real source **necessarily** lights up a 2–3 km blob. Quote both.
 
-⚠️ **State 4/4 honestly.** It is n=4 — four detectable sources, four zones — not a robust rate, and by our own Principle 8 a number that comes back at 100% deserves suspicion before applause. The conservative companion number is **cell-level precision 77%**; its shortfall is *plume extent inside correctly-found zones* (the failing cells are a median 2.5 km from the source that produced them, and sit inside that source's own zone), not false accusations. A 1.6 km satellite footprint plus advection means a real source **necessarily** lights up a 2–3 km blob. Quote both numbers.
+### 🚩 The coverage-bias number, stated correctly
+
+An earlier draft of this document reported **"0 of 9 sources sit within 2 km of a monitor"** as the headline coverage-bias finding. **It is not a finding. It is an assumption**, and reporting it as a measurement is precisely the error Principle 8 exists to prevent.
+
+`pick_station_cells()` places monitors by excluding each source's cell and its k=2 ring — an effective floor of ~1.9–2.4 km. Exactly **one** of 1,039 candidate cells survives inside 2 km of a source, so P(any of the 12 stations lands there) = **1.1%**. The statement is true ~99% of the time *by construction*: it restates CPCB siting norms, which is why we model it, but a synthetic world cannot **discover** its own placement rule. That is the same class of error as the 100% attribution trap, wearing a different hat.
+
+**The empirical version, which owes nothing to our placement rule:** scatter the same 12 monitors *uniformly at random* over the city — the least biased network anyone could build, with nothing avoiding sources on purpose — and they catch a **median of 1 of 9 sources. They miss 8 of 9.** P(a random network catches zero) = 21%. Only 12% of the city lies within 2 km of a source.
+
+That is pure geometry, and it is the stronger claim: **sparsity misses sources before siting bias even gets a turn.** A dozen sensors cannot cover a city, however honestly you place them. Siting bias then makes it worse.
+
+### And the recall does not depend on any of it
+
+`scripts/eval_station_sensitivity.py` re-runs detection with the station exclusion dialled from k=2 (realistic siting) to k=0 (monitors may sit *directly on* a source). **Recall is constant at 4/4 across every regime**, because detection reads satellite + FIRMS and never touches a station. Fusion LOSO R², by contrast, moves from 0.90 to 0.72 — as it must, since it is trained on stations.
+
+One number is siting-dependent; the other is not. That contrast is the evidence that the headline is not an artefact of a rule we invented.
 
 ### Known blind spots (stated, not hidden)
 

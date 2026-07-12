@@ -151,10 +151,21 @@ def main():
     print(f"   the shortfall is plume extent inside correctly-found zones, not "
           f"false accusations.)")
     print()
-    print(f"STATION BASELINE: {df.near_a_station.sum()}/{len(df)} sources sit within "
+    print(f"STATION SEPARATION: {df.near_a_station.sum()}/{len(df)} sources sit within "
           f"{STATION_KM:.0f} km of a monitor.")
-    print("  ^ this is the coverage-bias number: a station-only dashboard cannot")
-    print("    see what no station is standing next to.")
+    print("  !! THIS IS AN ASSUMPTION OF THE WORLD MODEL, NOT A FINDING. !!")
+    print("  pick_station_cells() excludes the source cell + its k=2 ring, an effective")
+    print("  floor of ~1.9-2.4 km, so '0 within 2 km' is true ~99% of the time BY")
+    print("  CONSTRUCTION (1 of 1039 candidate cells survives inside 2 km; P(a station")
+    print("  lands there) = 1.1%). It restates CPCB siting norms, which is why we model")
+    print("  it — but a synthetic world cannot DISCOVER its own placement rule.")
+    print("  For the empirical version, run scripts/eval_coverage_bias.py against real")
+    print("  monitors and real OSM industry. That number is checkable; this one is not.")
+    print()
+    print("  What is NOT assumed: the recall above. Detection reads satellite + FIRMS and")
+    print("  never touches a station, so it is invariant to where the monitors sit —")
+    print("  see scripts/eval_station_sensitivity.py, which re-runs it with the exclusion")
+    print("  switched off entirely.")
 
 
 if __name__ == "__main__":

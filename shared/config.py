@@ -35,6 +35,12 @@ WARD_GEOJSON = ROOT / "data" / "BBMP.geojson"   # official ward boundaries
 H3_RES = 8            # ~460 m edge -> satisfies "1 km grid" requirement
 PANEL_HOURS = 24 * 60 # synthetic/backfill window: 60 days hourly
 
+# The synthetic world ends HERE, not at utcnow(). Anchoring it makes every
+# reported number reproducible; with a sliding clock the same code gave 72
+# hotspot cells at 22:00 and 93 at 02:00, and every stat silently carried an
+# "as measured last Tuesday" caveat. Live mode is unaffected.
+SYNTHETIC_ANCHOR = "2026-07-01T12:00:00"
+
 # Multi-window detection. A real-time spike is noise; a source is something that
 # is STILL there when you zoom out. We aggregate the signal over several windows
 # and require agreement across them, which is what separates a long-term source
