@@ -141,8 +141,13 @@ def fetch_osm() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------- runner
+def fetch_s5p() -> pd.DataFrame:
+    from ingestion.collectors.sentinel import fetch_satellite
+    return fetch_satellite()
+
+
 REAL = {"stations": fetch_stations, "weather": fetch_weather,
-        "fires": fetch_fires, "osm": fetch_osm}
+        "fires": fetch_fires, "osm": fetch_osm, "satellite": fetch_s5p}
 
 
 def run(synthetic: bool = False) -> dict:
@@ -159,16 +164,37 @@ def run(synthetic: bool = False) -> dict:
                 out[name] = fn()
                 print(f"[ingest] {name}: LIVE ok ({len(out[name])} rows)")
             except Exception as e:
+                # The SATELLITE is not allowed to fall back. Every other source can
+                # degrade to synthetic and still leave a coherent (if partly
+                # simulated) world. The satellite cannot, for two reasons:
+                #
+                #   1. Detection runs ENTIRELY on it. A synthetic satellite carries
+                #      nine invented sources at invented coordinates. Joined to real
+                #      stations, the pipeline would confidently name polluters that
+                #      do not exist, in a real city, on a real map. That is not a
+                #      degraded output — it is a fabricated one.
+                #   2. The units differ by six orders of magnitude (mol/m^2 vs the
+                #      synthetic world's arbitrary scale), so the mixture is not even
+                #      internally consistent.
+                #
+                # Failing loudly is the only honest option. Use --synthetic to run
+                # the whole world offline, which is coherent, or fix GEE auth.
+                if name == "satellite":
+                    raise RuntimeError(
+                        f"Sentinel-5P fetch failed ({type(e).__name__}: {e}).\n"
+                        f"REFUSING to substitute a synthetic satellite in live mode: "
+                        f"detection runs entirely on this layer, and pairing invented "
+                        f"sources with real stations would fabricate accusations "
+                        f"against real places.\n"
+                        f"Either fix GEE auth (`gcloud auth application-default login`, "
+                        f"and see docs/gcp-setup.md), or run the whole world offline "
+                        f"with --synthetic."
+                    ) from e
                 if synth is None:
                     synth = generate_all()
                 out[name] = synth[name]
                 print(f"[ingest] {name}: live failed ({type(e).__name__}: {e}) -> synthetic fallback")
-        # satellite: GEE handled separately; use synthetic until configured
-        if synth is None:
-            synth = generate_all()
-        out.setdefault("satellite", synth["satellite"])
-        if "_truth" in synth:
-            out["_truth"] = synth["_truth"]
+
     for name, df in out.items():
         df.to_parquet(DATA_RAW / f"{name.lstrip('_')}.parquet", index=False)
         print(f"[ingest] wrote data/raw/{name.lstrip('_')}.parquet  {df.shape}")

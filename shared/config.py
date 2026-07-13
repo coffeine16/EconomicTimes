@@ -78,6 +78,12 @@ FIRE_RADIUS_KM = 1.5
 # 30-day window is ~36 hours of burning: unambiguous, not a barbecue.
 FIRE_FRAC_SCALE = 0.05
 
+# Google Earth Engine (Sentinel-5P). Auth is Application Default Credentials:
+#   gcloud auth application-default login
+# No service-account key: the project has constraints/iam.disableServiceAccountKeyCreation
+# switched on, which is a good default we are not going to fight.
+GEE_PROJECT = os.environ.get("GEE_PROJECT", "aq-intelligence")
+
 # API endpoints (all free)
 OPENAQ_URL = "https://api.openaq.org/v3"
 OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast"
