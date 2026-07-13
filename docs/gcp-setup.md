@@ -37,8 +37,10 @@ immediately, don't just delete the commit.
 1. <https://console.cloud.google.com> → project dropdown → **New Project**
 2. Name it something like `aq-intelligence`. Note the **Project ID** (it is *not*
    the display name — it looks like `aq-intelligence-431207`). You will need it.
-3. Make sure billing is linked to the trial (Earth Engine registration wants a
-   billing-enabled project even on the free non-commercial tier).
+3. **Billing: Earth Engine does NOT require it on the Community Tier.** Link the
+   trial billing account anyway — not for Earth Engine, but because **Cloud Storage
+   exports do need it**, and it's what the $300 credits are attached to. Earth
+   Engine itself stays free as long as the project is registered non-commercial.
 
 ### A2. Enable the APIs
 In the project, enable:
@@ -48,9 +50,14 @@ In the project, enable:
 Console → *APIs & Services* → *Enable APIs and Services* → search → Enable.
 
 ### A3. Register the project for Earth Engine
-1. Go to <https://code.earthengine.google.com/register>
+1. Go to <https://code.earthengine.google.com/register> (this is a questionnaire in
+   the Cloud console — since 2024-06-17 **every** Cloud project using Earth Engine
+   must be registered as commercial or non-commercial, or it gets no access).
 2. Select the Cloud project you just made.
 3. Choose **non-commercial / unpaid** usage (see the warning above).
+   - **Community Tier** → free, **no billing account required**. This is us.
+   - *Contributor Tier* → also free for Earth Engine, but requires a billing
+     account for identity verification. Either is fine; Community is simpler.
 4. Submit. **This is the step with approval latency.** It may be instant, it may
    take a couple of days. Do it first and go do something else.
 
@@ -67,18 +74,41 @@ If that prints an image, we have access. **Tell the team the moment it does.**
 ### A4. Service account (so the pipeline can run without a browser)
 1. Console → *IAM & Admin* → *Service Accounts* → **Create Service Account**
 2. Name: `aq-earthengine`
-3. Grant it these roles:
+3. Grant it these roles — **all three**:
    - **Earth Engine Resource Viewer** (`roles/earthengine.viewer`)
-   - **Storage Object Admin** (`roles/storage.objectAdmin`) — only on our bucket,
-     for exports
+   - **Service Usage Consumer** (`roles/serviceusage.serviceUsageConsumer`)
+     ← ⚠️ **easy to miss, and nothing works without it.** The Earth Engine API needs
+     `serviceusage.services.use` on the project. Without this role the smoke test in
+     A6 fails with an opaque permissions error and you will waste an hour on it.
+     (Owner/Editor also grant it, but don't hand a service account Owner.)
+   - **Storage Object Admin** (`roles/storage.objectAdmin`) — for the export bucket
 4. Open the service account → *Keys* → **Add Key → Create new key → JSON**
 5. It downloads a `.json`. **Save it as `secrets/gee-service-account.json`** in the
    repo (that path is gitignored). Do not paste it in Discord.
 
-> If Earth Engine rejects the service account, it may need to be registered
-> separately at <https://signup.earthengine.google.com/#!/service_accounts>.
-> Newer projects usually inherit access from the registered project — try without
-> first, and only do this if you get a permissions error.
+Or just do it from the CLI:
+
+```bash
+PROJECT_ID=<your-project-id>
+SA="aq-earthengine@${PROJECT_ID}.iam.gserviceaccount.com"
+
+gcloud iam service-accounts create aq-earthengine --project="$PROJECT_ID"
+
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${SA}" --role="roles/earthengine.viewer"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${SA}" --role="roles/serviceusage.serviceUsageConsumer"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${SA}" --role="roles/storage.objectAdmin"
+
+gcloud iam service-accounts keys create secrets/gee-service-account.json \
+  --iam-account="$SA"
+```
+
+> **Note:** service accounts now inherit Earth Engine access from the *registered
+> Cloud project* via these IAM roles. The old separate registration flow at
+> `signup.earthengine.google.com/#!/service_accounts` is legacy — you should not
+> need it. If you land on it, you're on the wrong path.
 
 ### A5. Create the export bucket
 ```bash
@@ -106,6 +136,17 @@ print(img.bandNames().getInfo())     # should print a list of band names
 
 **When this prints band names, you are done with Part A.** Post the Project ID and
 say "GEE is live" — that unblocks the collector.
+
+### If the smoke test fails
+| error says | it means |
+|---|---|
+| `Permission 'serviceusage.services.use' denied` | missing **Service Usage Consumer** — step A4, role 2 |
+| `not signed up for Earth Engine` / `project is not registered` | A3 hasn't been approved yet. Wait, don't debug. |
+| `Earth Engine API has not been used in project ... before` | A2 — enable the Earth Engine API |
+| `Caller does not have permission` on export | missing **Storage Object Admin**, or the bucket is in another project |
+
+Ninety percent of failures here are A3 not being approved yet. **Check the
+registration status before debugging anything else.**
 
 ---
 
