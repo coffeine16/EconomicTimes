@@ -3,3 +3,11 @@ __pycache__/
 data/raw/*.parquet
 data/outputs/*
 .env
+
+# Credentials. NEVER commit these.
+# The GCP service-account JSON is a live private key: leaking it lets anyone bill
+# our project. If one is ever pushed, REVOKE it in the console — deleting the
+# commit is not enough, it is already in the history and in anyone's clone.
+secrets/
+*-service-account.json
+*.pem
