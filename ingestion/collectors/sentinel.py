@@ -73,14 +73,46 @@ def _init_ee():
     """
     import ee
 
+    # 1) Service-account key, if one was explicitly provided (CI, a server). Our
+    #    project forbids key creation by org policy, so this is the rare path.
     key = os.environ.get("GEE_SERVICE_ACCOUNT_JSON")
     if key and os.path.exists(key):
         import json
         email = json.loads(open(key).read())["client_email"]
         ee.Initialize(ee.ServiceAccountCredentials(email, key), project=GEE_PROJECT)
-    else:
-        ee.Initialize(project=GEE_PROJECT)
-    return ee
+        return ee
+
+    # 2) Application Default Credentials — the normal path. Ask for them EXPLICITLY
+    #    rather than letting ee.Initialize() go looking: its implicit lookup prefers
+    #    Earth Engine's own credential file and, when nothing is there, raises
+    #    "run earthengine authenticate" — which sends you down a different auth path
+    #    than the one this project actually uses, on a machine that just needs
+    #    `gcloud auth application-default login`.
+    try:
+        import google.auth
+        creds, _ = google.auth.default()
+        ee.Initialize(credentials=creds, project=GEE_PROJECT)
+        return ee
+    except Exception as adc_err:
+        # 3) Fall back to whatever `earthengine authenticate` may have stored.
+        try:
+            ee.Initialize(project=GEE_PROJECT)
+            return ee
+        except Exception:
+            raise RuntimeError(
+                f"No Earth Engine credentials on this machine (ADC lookup said: "
+                f"{type(adc_err).__name__}: {adc_err}).\n\n"
+                f"Fix with EITHER:\n"
+                f"  gcloud auth application-default login "
+                f"--scopes=https://www.googleapis.com/auth/earthengine,"
+                f"https://www.googleapis.com/auth/cloud-platform\n"
+                f"  gcloud auth application-default set-quota-project {GEE_PROJECT}\n\n"
+                f"OR, if you would rather not install gcloud at all:\n"
+                f"  python -c \"import ee; ee.Authenticate()\"\n\n"
+                f"Then make sure your Google account has roles/earthengine.viewer and\n"
+                f"roles/serviceusage.serviceUsageConsumer on project '{GEE_PROJECT}'.\n"
+                f"See docs/gcp-setup.md."
+            ) from adc_err
 
 
 def _cell_points(ee):
