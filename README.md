@@ -209,7 +209,7 @@ Because a README that oversells is the same bug as a metric that oversells.
 | H3 spatial fabric + ward layer | ✅ real (official GeoJSON if present, deterministic Voronoi fallback) |
 | Detection (NO₂ contrast + fire persistence) | ✅ real — validated on a real landfill fire |
 | Attribution + evidence chain + confidence | ✅ real, truth-scored, calibrated |
-| **Fusion exposure field** | ⚠️ **does not generalise.** LOSO R² 0.90 synthetic, **0.48 on Delhi** — and 22% *worse* than the naive station-mean. Unsolved. |
+| **Fusion exposure field** | ❌ **claim withdrawn.** On real Delhi it is **14% worse than a naive city-mean** (RMSE 75.4 vs 66.0). We tried predicting the *deviation* from the city median — a construction that cannot lose to the baseline — and it still lost, which means the spatial model has **no transferable skill** across held-out stations. We do not claim it. |
 | Read-only serving API | ✅ real |
 | Forecast, EPS/dispatch, memo, advisory, frontend, n8n | ⬜ **not built** |
 

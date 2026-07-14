@@ -1,8 +1,35 @@
-"""Coverage-debiased fusion field.
+"""The fusion field — and the honest verdict on it.
 
+⚠️ READ THIS BEFORE QUOTING ANY NUMBER FROM THIS FILE.
+
+The "coverage-debiased exposure map" is NOT VALIDATED ON REAL DATA. On Delhi
+(24 real CPCB stations, Nov 2025), leave-one-station-out says:
+
+    fusion            RMSE 75.4   R2 0.52
+    naive city-mean   RMSE 66.0            <- BETTER, by 14%
+
+We tried the obvious fix: predict the DEVIATION from the city median rather than
+the absolute level, so the model only has to learn what stations cannot tell you.
+That construction cannot lose to the baseline — predicting a zero residual IS the
+baseline — and yet it still lost. Which means the residual model is predicting
+NON-ZERO spatial corrections that are WRONG: it is fitting the training stations'
+local siting quirks (roadside vs background), not learnable spatial structure that
+transfers to a station it has never seen.
+
+THE HONEST READING: with ~24 stations, we cannot demonstrate that our spatial model
+improves on a city-mean at a held-out station. The exposure claim in Layer 3 does
+not survive contact with real data, and we do not make it. Detection is the
+contribution; this is an interpolation we cannot prove is better than the trivial
+one. (On the synthetic world it does win — LOSO R2 0.84 vs naive 9.97 RMSE — but a
+synthetic world we wrote is not evidence about Delhi.)
+
+The field is still produced and still used for EXPOSURE context (pm25_med in a
+hotspot card, the severity term). It is not sold as validated.
+
+--
 Train on cells that HAVE a station (features -> measured PM2.5), predict every
-cell citywide. Headline rigor number: leave-one-station-out (LOSO) validation —
-hide each station entirely, predict its cell from the others, report the error.
+cell citywide. Headline number: leave-one-station-out (LOSO) — hide each station
+entirely, predict its cell from the others, report the error.
 
 Outputs:
   data/outputs/fusion_field.parquet   per (cell, hour): pm25_hat

@@ -167,8 +167,15 @@ leakage before you assume success.
     check by googling "Bhalswa landfill fire November 2025".
   - Okhla -> `traffic` (it genuinely sits on Mathura Road; defensible, incomplete).
     Ghazipur -> not detected (no fires in the window).
-  - ⚠️ Fusion does **not** generalise: LOSO R2 **0.48** on Delhi, and **22% WORSE**
-    than the naive station-mean. Do not quote the synthetic 0.90 as if it holds.
+  - ❌ **The fusion exposure claim is WITHDRAWN.** On real Delhi it is **14% worse
+    than a naive city-mean** (RMSE 75.4 vs 66.0, LOSO R2 0.52). We tried predicting
+    the DEVIATION from the city median instead of the level — a construction that
+    *cannot* lose to the baseline, since a zero residual IS the baseline — and it
+    still lost. So the residual model predicts non-zero spatial corrections that are
+    WRONG: it fits the training stations' siting quirks, not structure that transfers
+    to a station it has never seen. With ~24 stations we cannot demonstrate spatial
+    skill. Detection is the contribution. Do not quote the synthetic 0.84 as if it
+    says anything about Delhi.
   - 🚩 **"0 of 9 sources within 2 km of a monitor" is NOT a finding.** It is an
     assumption: `pick_station_cells` excludes each source's k=2 ring (floor
     ~1.9-2.4 km), so it is true ~99% of the time by construction. Reporting it as
