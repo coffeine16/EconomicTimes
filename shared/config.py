@@ -27,10 +27,44 @@ def _load_dotenv(path: Path = ROOT / ".env") -> None:
 
 _load_dotenv()
 
-# ---- City: Bengaluru (swap bbox + ward geojson to change city) ----
-CITY = "bengaluru"
-BBOX = {"lat_min": 12.85, "lat_max": 13.10, "lon_min": 77.45, "lon_max": 77.75}
-WARD_GEOJSON = ROOT / "data" / "BBMP.geojson"   # official ward boundaries
+# ---- City ----
+# Override with AQ_CITY=delhi. Everything downstream is city-agnostic; only the
+# bbox and the ward layer change.
+CITIES = {
+    "bengaluru": {"lat_min": 12.85, "lat_max": 13.10, "lon_min": 77.45, "lon_max": 77.75},
+    "delhi":     {"lat_min": 28.45, "lat_max": 28.75, "lon_min": 76.95, "lon_max": 77.35},
+}
+CITY = os.environ.get("AQ_CITY", "bengaluru").lower()
+if CITY not in CITIES:
+    raise ValueError(f"AQ_CITY={CITY!r} unknown; choose from {list(CITIES)}")
+BBOX = CITIES[CITY]
+WARD_GEOJSON = ROOT / "data" / f"{CITY}_wards.geojson"   # real boundaries if present
+
+# ---- The window the live collectors pull ----
+# Default: now. Set AQ_WINDOW_END=2025-11-30 to run the whole pipeline over a
+# HISTORICAL episode instead.
+#
+# This exists because we measured the alternative. In July (monsoon) BOTH of the
+# detector's best instruments are blind: cloud masks the S5P NO2 retrieval (29%
+# coverage over Bengaluru), and nothing burns when it is wet — real FIRMS returns
+# 2 fires over Bengaluru and 9 over Delhi in 60 days, against 281 in our synthetic
+# world. Fire persistence is ~0 in every cell, so the FIRMS channel — half the
+# detector, and the half that locates unregistered burning sources — contributes
+# nothing at all.
+#
+# Delhi's stubble-burning season is Oct-Nov: dry skies (high NO2 coverage) and a
+# landscape genuinely on fire. Running the platform there is not cherry-picking,
+# it is pointing the instrument at the season it was built for and that the
+# instrument can actually see.
+WINDOW_END = os.environ.get("AQ_WINDOW_END")   # "YYYY-MM-DD" or None -> now
+
+
+def window_end():
+    """End of the collection window, as a UTC midnight Timestamp."""
+    import pandas as pd
+    if WINDOW_END:
+        return pd.Timestamp(WINDOW_END, tz="UTC").normalize()
+    return pd.Timestamp.now("UTC").normalize()
 
 H3_RES = 8            # ~460 m edge -> satisfies "1 km grid" requirement
 PANEL_HOURS = 24 * 60 # synthetic/backfill window: 60 days hourly
@@ -87,6 +121,7 @@ GEE_PROJECT = os.environ.get("GEE_PROJECT", "aq-intelligence")
 # API endpoints (all free)
 OPENAQ_URL = "https://api.openaq.org/v3"
 OPENMETEO_URL = "https://api.open-meteo.com/v1/forecast"
+OPENMETEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"  # ERA5, for historical windows
 FIRMS_URL = "https://firms.modaps.eosdis.nasa.gov/api/area/csv"  # + /{KEY}/VIIRS_SNPP_NRT/{bbox}/2
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 

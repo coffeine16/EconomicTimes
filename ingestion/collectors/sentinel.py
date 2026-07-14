@@ -38,7 +38,7 @@ import sys
 
 import pandas as pd
 
-from shared.config import BBOX, DATA_RAW, GEE_PROJECT, PANEL_HOURS
+from shared.config import BBOX, DATA_RAW, GEE_PROJECT, PANEL_HOURS, window_end
 from shared.grid import city_cells, cell_center
 
 # collection -> (band, output column, scale factor)
@@ -146,7 +146,12 @@ def fetch_satellite(days: int | None = None) -> pd.DataFrame:
     """
     ee = _init_ee()
     days = days or PANEL_HOURS // 24
-    end = pd.Timestamp.utcnow().normalize() - pd.Timedelta(days=S5P_LAG_DAYS)
+    end = window_end()
+    now = pd.Timestamp.now("UTC").normalize()
+    # The OFFL lag only matters if we are asking for RECENT days. A historical
+    # window is long since published, so do not back off from it.
+    if (now - end).days < S5P_LAG_DAYS:
+        end = now - pd.Timedelta(days=S5P_LAG_DAYS)
     start = end - pd.Timedelta(days=days)
 
     region = ee.Geometry.Rectangle(

@@ -83,13 +83,31 @@ def category_scores(ev: dict) -> dict:
     """Plain arithmetic per category. The LLM never touches this."""
     s = {c: 0.0 for c in CATEGORIES}
     for cand in ev["candidates"]:
-        # upwind proximity: alignment high & distance small -> strong
-        s[cand["type"]] += cand["wind_alignment"] * np.exp(-cand["distance_km"] / 2.0)
+        # upwind proximity: alignment high & distance small -> strong.
+        #
+        # MAX, not SUM. Summing asks "how many mapped sites of this type are near
+        # me", which is a question about OSM's coverage, not about who is polluting.
+        # Our synthetic world had 2 traffic corridors; real Delhi has 1,240 mapped
+        # ones, so traffic accumulated an unbeatable score by sheer count and buried
+        # a burning landfill with a strong fire signal underneath it. (Measured:
+        # both Bhalswa and Okhla were attributed to `traffic`.)
+        #
+        # The right question is "how strong is the BEST candidate of this type",
+        # which is what an inspector would ask.
+        v = cand["wind_alignment"] * np.exp(-cand["distance_km"] / 2.0)
+        s[cand["type"]] = max(s[cand["type"]], v)
+    # SO2 -> industrial and AAI -> burning are GONE as scoring signals.
+    #
+    # They are textbook fingerprints and they are unusable here: measured on real
+    # S5P over two cities, both have SNR < 1.1 — SO2 is 49% NEGATIVE with a MAD 30x
+    # its median. Citing "SO2 at p85 citywide" in an evidence chain is citing a coin
+    # flip, and that chain is what an administrator puts in front of a violator.
+    # (Measured: it was the deciding evidence for calling Okhla landfill industrial.)
+    #
+    # What replaces them: for burning, FIRMS fire — direct observation, no inference.
+    # For industry, the named OSM candidate plus NO2, which is a real combustion
+    # tracer. See intelligence/agents/detect.py::POLLUTANTS for the measurements.
     sig = ev["pollutant_signature"]
-    if sig.get("so2_col", {}).get("city_percentile", 0) >= 80:
-        s["industrial"] += 0.8
-    if sig.get("aai", {}).get("city_percentile", 0) >= 80:
-        s["waste_burning"] += 0.8
     hour = ev["meteorology"]["hour_local"]
     if sig.get("no2_col", {}).get("city_percentile", 0) >= 80 and (7 <= hour <= 10 or 17 <= hour <= 20):
         s["traffic"] += 0.8
@@ -120,8 +138,8 @@ def independent_signals(ev: dict, top: str) -> int:
     n = 0
     if any(c["type"] == top and c["wind_alignment"] > 0.4 for c in ev["candidates"]):
         n += 1
-    sig_map = {"industrial": "so2_col", "waste_burning": "aai", "traffic": "no2_col"}
-    if top in sig_map and ev["pollutant_signature"].get(sig_map[top], {}).get("city_percentile", 0) >= 80:
+    # only NO2 is a usable fingerprint; SO2/AAI are noise (see category_scores)
+    if top == "traffic" and ev["pollutant_signature"].get("no2_col", {}).get("city_percentile", 0) >= 80:
         n += 1
     if top == "waste_burning" and ev["fire_activity"]["fire_hour_fraction"] > 0:
         n += 1
@@ -179,9 +197,8 @@ def rule_based_reason(ev: dict, scores: dict, top: str) -> dict:
         factors.append(f'{best_cand["name"]} is {best_cand["distance_km"]} km away, '
                        f'wind alignment {best_cand["wind_alignment"]}')
     sig = ev["pollutant_signature"]
-    sig_map = {"industrial": "so2_col", "waste_burning": "aai", "traffic": "no2_col"}
-    if top in sig_map and sig.get(sig_map[top], {}).get("city_percentile", 0) >= 80:
-        factors.append(f'{sig_map[top]} at p{sig[sig_map[top]]["city_percentile"]} citywide')
+    if top == "traffic" and sig.get("no2_col", {}).get("city_percentile", 0) >= 80:
+        factors.append(f'NO2 column at p{sig["no2_col"]["city_percentile"]} citywide')
     fa = ev["fire_activity"]
     if top == "waste_burning" and fa["fire_hours"]:
         factors.append(f'satellite fire detections in {fa["fire_hours"]} hours '

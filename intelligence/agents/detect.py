@@ -44,7 +44,28 @@ from shared.grid import cell_center, haversine_km
 from shared.wards import attach_wards
 from intelligence.models.signals import neighbourhood_contrast, classify_persistence
 
-POLLUTANTS = ["no2_col", "so2_col", "aai"]
+# DETECTION CHANNELS — cut down to the two that survived contact with real data.
+#
+# We used to score on max(contrast) across NO2, SO2 and AAI. Measured on real S5P
+# over both Bengaluru and Delhi, SO2 and AAI have NO resolvable spatial structure:
+#
+#     channel   SNR (spatial signal / noise surviving a 60-day median)
+#     NO2       2.6 - 2.8     real
+#     SO2       0.66 - 0.87   NOISE
+#     AAI       0.76 - 1.03   NOISE
+#
+# (Real S5P SO2 over a city is 49% NEGATIVE with a MAD 30x its median. TROPOMI SO2
+# is built for volcanoes and mega point-sources; an urban industrial cluster sits
+# far under its noise floor. AAI at a 5.5 km footprint sees regional aerosol, not a
+# landfill.) Taking the max across one signal and two noise fields means the max is
+# usually noise: on real Delhi, 87% of 470 detected cells were driven by SO2 (63%)
+# or AAI (24%) — i.e. we were manufacturing enforcement targets out of retrieval
+# error, and a real burning landfill was ranked BELOW them.
+#
+# The synthetic world gave both channels clean signatures they do not have. This is
+# the cost of an instrument model that was kinder than the instrument.
+POLLUTANTS = ["no2_col"]
+NOISE_CHANNELS = ["so2_col", "aai"]   # kept in the panel for exposure/evidence, not for detection
 CONTRAST_THRESH = 2.0    # robust-z above the surrounding annulus to count as hot
 
 # Enforceability. `road` is excluded on purpose: you cannot serve a notice on a
@@ -133,11 +154,15 @@ def _mark_attributable(hot: pd.DataFrame) -> pd.DataFrame:
         near.append(round(d, 2))
     hot["nearest_candidate_km"] = near
 
+    # The SO2/AAI "point-source tracer" clauses are GONE. They were the theoretical
+    # justification for calling a zone enforceable without a named candidate — and
+    # they were noise. Keeping them would mean promoting retrieval error into an
+    # inspection order.
+    #
+    # What survives: a named site you can visit, or a fire you can drive to.
     hot["attributable"] = (
         (hot.nearest_candidate_km <= ATTRIBUTABLE_KM)
         | (hot.c_fire > 0)
-        | (hot.c_so2_col >= POINT_TRACER_Z)
-        | (hot.c_aai >= POINT_TRACER_Z)
     )
     return hot
 

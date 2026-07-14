@@ -123,8 +123,16 @@ def build_panel() -> pd.DataFrame:
     panel = panel.merge(weather, on="ts", how="left")
 
     # satellite (daily -> forward-filled onto hours)
+    #
+    # The two worlds disagree on tz-awareness: the synthetic satellite emits a naive
+    # date, the live GEE collector emits a UTC-aware one, and merging naive against
+    # aware raises. Coerce to naive here rather than in one collector, so the panel
+    # cannot be broken by whichever source it happens to be handed.
     sat = sat.copy()
     sat["date"] = pd.to_datetime(sat.date)
+    if getattr(sat["date"].dt, "tz", None) is not None:
+        sat["date"] = sat["date"].dt.tz_localize(None)
+    sat["date"] = sat["date"].dt.normalize()
     panel["date"] = panel.ts.dt.tz_localize(None).dt.normalize()
     panel = panel.merge(sat, on=["cell", "date"], how="left").drop(columns="date")
     panel[["no2_col", "so2_col", "aai"]] = (

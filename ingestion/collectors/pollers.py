@@ -9,13 +9,15 @@ a GEE service account; synthetic satellite is used until that's configured).
 import os
 import sys
 import json
+import time
 import urllib.request
 import urllib.parse
 
 import pandas as pd
 
-from shared.config import (BBOX, DATA_RAW, OPENAQ_URL, OPENMETEO_URL, FIRMS_URL,
-                          OVERPASS_URL, PANEL_HOURS)
+from shared.config import (BBOX, DATA_RAW, OPENAQ_URL, OPENMETEO_URL,
+                           OPENMETEO_ARCHIVE_URL, FIRMS_URL, OVERPASS_URL,
+                           PANEL_HOURS, window_end)
 from shared.grid import latlng_to_cell
 
 
@@ -53,7 +55,7 @@ def fetch_stations(days: int | None = None) -> pd.DataFrame:
     })
     locs = json.loads(_get(f"{OPENAQ_URL}/locations?{q}", headers))["results"]
 
-    end = pd.Timestamp.utcnow().floor("h")
+    end = window_end()
     start = end - pd.Timedelta(days=days)
     rows = []
     for loc in locs:
@@ -103,12 +105,30 @@ def fetch_weather(days: int | None = None) -> pd.DataFrame:
     days = days or PANEL_HOURS // 24
     lat = (BBOX["lat_min"] + BBOX["lat_max"]) / 2
     lon = (BBOX["lon_min"] + BBOX["lon_max"]) / 2
-    q = urllib.parse.urlencode({
-        "latitude": lat, "longitude": lon,
-        "hourly": "wind_speed_10m,wind_direction_10m,temperature_2m,boundary_layer_height",
-        "past_days": min(days, 92), "forecast_days": 3, "wind_speed_unit": "ms",
-    })
-    j = json.loads(_get(f"{OPENMETEO_URL}?{q}"))["hourly"]
+    end = window_end()
+    start = end - pd.Timedelta(days=days)
+
+    # The forecast endpoint only reaches ~92 days back. A historical episode needs
+    # the ERA5 archive, which is a different host entirely — and still carries
+    # boundary_layer_height, which is the single strongest meteorological predictor
+    # we have (a shallow boundary layer traps everything).
+    historical = (pd.Timestamp.now("UTC").normalize() - end).days > 60
+    if historical:
+        q = urllib.parse.urlencode({
+            "latitude": lat, "longitude": lon,
+            "start_date": str(start.date()), "end_date": str(end.date()),
+            "hourly": "wind_speed_10m,wind_direction_10m,temperature_2m,boundary_layer_height",
+            "wind_speed_unit": "ms",
+        })
+        url = f"{OPENMETEO_ARCHIVE_URL}?{q}"
+    else:
+        q = urllib.parse.urlencode({
+            "latitude": lat, "longitude": lon,
+            "hourly": "wind_speed_10m,wind_direction_10m,temperature_2m,boundary_layer_height",
+            "past_days": min(days, 92), "forecast_days": 3, "wind_speed_unit": "ms",
+        })
+        url = f"{OPENMETEO_URL}?{q}"
+    j = json.loads(_get(url, timeout=90))["hourly"]
     return pd.DataFrame({
         "ts": pd.to_datetime(j["time"]),
         "wind_from_deg": j["wind_direction_10m"],
@@ -123,7 +143,8 @@ def fetch_weather(days: int | None = None) -> pd.DataFrame:
 # The web form's dropdown offers more, which is misleading. 60 days = 12 calls,
 # against a quota of 5000 per 10 minutes, so the chunking costs us nothing.
 FIRMS_MAX_DAY_RANGE = 5
-FIRMS_SOURCE = "VIIRS_SNPP_NRT"
+FIRMS_SOURCE = "VIIRS_SNPP_NRT"          # last ~2 months only
+FIRMS_ARCHIVE_SOURCE = "VIIRS_SNPP_SP"   # reprocessed archive, for older windows
 
 
 def fetch_fires(days: int | None = None) -> pd.DataFrame:
@@ -150,13 +171,22 @@ def fetch_fires(days: int | None = None) -> pd.DataFrame:
                            "https://firms.modaps.eosdis.nasa.gov/api/map_key/")
     days = days or PANEL_HOURS // 24
     bbox = f'{BBOX["lon_min"]},{BBOX["lat_min"]},{BBOX["lon_max"]},{BBOX["lat_max"]}'
-    end = pd.Timestamp.utcnow().normalize()
+    end = window_end()
     start = end - pd.Timedelta(days=days)
+
+    # NRT ("near real time") only covers roughly the last two months. Anything older
+    # lives in SP ("standard processing"), the reprocessed archive. Asking NRT for a
+    # date outside its retention returns an empty CSV rather than an error — i.e. it
+    # looks exactly like "no fires", which is the single most dangerous failure mode
+    # in this collector: a burning season would come back silent and clean.
+    age_days = (pd.Timestamp.now("UTC").normalize() - end).days
+    source = FIRMS_SOURCE if age_days < 55 else FIRMS_ARCHIVE_SOURCE
+    print(f"[firms] {source} | {start.date()} .. {end.date()} ({days}d)")
 
     frames, day = [], start
     while day < end:
         chunk = min(FIRMS_MAX_DAY_RANGE, (end - day).days)
-        url = f"{FIRMS_URL}/{key}/{FIRMS_SOURCE}/{bbox}/{chunk}/{day.date()}"
+        url = f"{FIRMS_URL}/{key}/{source}/{bbox}/{chunk}/{day.date()}"
         text = _get(url, timeout=60).decode()
         # FIRMS can return a plain-text error body with HTTP 200 (e.g. an invalid
         # key), which pandas would happily parse into a garbage frame. Validate on
@@ -181,6 +211,15 @@ def fetch_fires(days: int | None = None) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------------- OSM
+# Public Overpass instances are free, shared, and rate-limited. One 504 is not
+# evidence that a city has no industry.
+OVERPASS_MIRRORS = [
+    OVERPASS_URL,
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.osm.ch/api/interpreter",
+]
+
+
 def fetch_osm() -> pd.DataFrame:
     """One Overpass bbox query: industry, construction, kilns, trunk roads, schools, hospitals."""
     bbox = f'{BBOX["lat_min"]},{BBOX["lon_min"]},{BBOX["lat_max"]},{BBOX["lon_max"]}'
@@ -210,14 +249,37 @@ def fetch_osm() -> pd.DataFrame:
     # Overpass returns 406 Not Acceptable to a request with no User-Agent. urllib's
     # default ("Python-urllib/3.x") is rejected outright, which is why this quietly
     # fell back to synthetic OSM on every live run.
-    req = urllib.request.Request(
-        OVERPASS_URL,
-        data=urllib.parse.urlencode({"data": query}).encode(),
-        headers={"User-Agent": "aq-intelligence-platform/0.1 (civic air quality research)",
-                 "Accept": "application/json"})
-    data = urllib.request.urlopen(req, timeout=180).read()
+    #
+    # It also 504s under load — reliably so on a city the size of Delhi, where the
+    # uncapped query is heavy. The public instance is a shared free service and
+    # owes us nothing, so we retry across mirrors rather than treat one bad minute
+    # as "this city has no factories". Failing here is NOT allowed to fall back to
+    # synthetic (see NO_FALLBACK), so it has to actually succeed.
+    elements, last = None, None
+    for attempt, endpoint in enumerate(OVERPASS_MIRRORS * 2):
+        try:
+            req = urllib.request.Request(
+                endpoint,
+                data=urllib.parse.urlencode({"data": query}).encode(),
+                headers={"User-Agent": "aq-intelligence-platform/0.1 (civic air quality research)",
+                         "Accept": "application/json"})
+            got = json.loads(urllib.request.urlopen(req, timeout=300).read())["elements"]
+            # A loaded mirror returns 200 with an EMPTY element list rather than an
+            # error. Accepting that writes a city with no industry in it, silently.
+            # An empty answer is not an answer.
+            if not got:
+                raise RuntimeError("200 OK but zero elements")
+            elements = got
+            break
+        except Exception as e:                       # 504/429/timeout/empty: next mirror
+            last = e
+            print(f"[osm] {endpoint.split('/')[2]} failed ({type(e).__name__}: {e}); "
+                  f"trying next mirror")
+            time.sleep(3 * (attempt + 1))
+    if elements is None:
+        raise RuntimeError(f"all Overpass mirrors failed or returned nothing; last: {last}")
     rows = []
-    for el in json.loads(data)["elements"]:
+    for el in elements:
         lat = el.get("lat") or el.get("center", {}).get("lat")
         lon = el.get("lon") or el.get("center", {}).get("lon")
         if lat is None:
@@ -282,8 +344,18 @@ def run(synthetic: bool = False) -> dict:
         synth = None
         for name, fn in REAL.items():
             try:
-                out[name] = fn()
-                print(f"[ingest] {name}: LIVE ok ({len(out[name])} rows)")
+                df = fn()
+                # AN EMPTY CRITICAL SOURCE IS AS DANGEROUS AS A FAILED ONE, and it
+                # does not raise. A public Overpass mirror under load will happily
+                # return HTTP 200 with an empty element list; we then wrote a
+                # zero-row OSM layer, and the whole run proceeded as if the city
+                # contained no industry at all. Treat "succeeded with nothing" as
+                # the failure it is.
+                if name in NO_FALLBACK and len(df) == 0:
+                    raise RuntimeError("returned ZERO rows (the request succeeded "
+                                       "but the payload was empty)")
+                out[name] = df
+                print(f"[ingest] {name}: LIVE ok ({len(df):,} rows)")
             except Exception as e:
                 # The SATELLITE is not allowed to fall back. Every other source can
                 # degrade to synthetic and still leave a coherent (if partly
