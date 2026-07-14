@@ -20,8 +20,7 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from shared.config import DATA_OUT
-from shared.wards import ward_frame
+from shared.config import DATA_OUT, DATA_RAW
 
 app = FastAPI(title="AQ Intelligence Platform API", version="0.1")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -52,11 +51,14 @@ def attributions():
 
 @app.get("/wards")
 def wards():
-    """cell -> ward map, so the frontend can aggregate any layer to ward level."""
-    w = ward_frame()
-    return {"synthetic": bool(w.attrs.get("synthetic", True)),
-            "n_wards": int(w.ward_id.nunique()),
-            "cells": w.to_dict("records")}
+    """cell -> ward map, as WRITTEN BY THE PIPELINE.
+
+    Never recomputed here. The API cannot know which city the data on disk belongs
+    to — config.CITY reads an env var the server process may not have — and guessing
+    wrong silently maps Delhi cells through a Bengaluru ward table, yielding NaN for
+    every ward and a 500 on any endpoint that joins against it.
+    """
+    return _json("wards.json")
 
 
 @app.get("/attribution/{cell}")
@@ -79,12 +81,51 @@ def fusion(hour_offset: int = 0):
         raise HTTPException(400, f"hour_offset must be in [0, {len(hours) - 1}] "
                                  f"(0 = latest hour); got {hour_offset}")
     at = hours[-1 - hour_offset]
-    snap = f[f.ts == at].merge(ward_frame()[["cell", "ward_id"]], on="cell", how="left")
+    wmap = {c["cell"]: c["ward_id"] for c in _json("wards.json")["cells"]}
+    snap = f[f.ts == at].dropna(subset=["pm25_hat"])   # NaN is not valid JSON
     return {"ts": str(at), "n_hours": len(hours),
-            "cells": [{"cell": r.cell, "ward_id": r.ward_id, "pm25": round(float(r.pm25_hat), 1)}
+            "cells": [{"cell": r.cell, "ward_id": wmap.get(r.cell, "unassigned"),
+                       "pm25": round(float(r.pm25_hat), 1)}
                       for r in snap.itertuples()]}
 
 
 @app.get("/loso")
 def loso():
     return _json("loso.json")
+
+
+@app.get("/stations")
+def stations():
+    """CAAQMS station locations + their latest reading. Feeds the map's station markers."""
+    p = DATA_RAW / "stations.parquet"
+    if not p.exists():
+        raise HTTPException(404, "stations not ingested yet — run the pipeline first")
+    df = pd.read_parquet(p)
+    df["ts"] = pd.to_datetime(df.ts, utc=True)
+    # Real CPCB stations drop readings — NaN is NOT valid JSON and FastAPI raises a
+    # 500 on it. Take each station's latest VALID reading, not its latest row.
+    df = df.dropna(subset=["pm25"])
+    if df.empty:
+        return []
+    latest = df.sort_values("ts").groupby("station_id").last().reset_index()
+    return [{"station_id": r.station_id, "cell": r.cell,
+             "lat": float(r.lat), "lon": float(r.lon),
+             "pm25": round(float(r.pm25), 1), "ts": str(r.ts)}
+            for r in latest.itertuples()]
+
+
+@app.get("/fires")
+def fires():
+    """FIRMS thermal detections in the window. The instrument that finds burning
+    sources directly — and the one that located Bhalswa."""
+    p = DATA_RAW / "fires.parquet"
+    if not p.exists():
+        raise HTTPException(404, "fires not ingested yet — run the pipeline first")
+    df = pd.read_parquet(p)
+    if df.empty:
+        return []
+    df["ts"] = pd.to_datetime(df.ts, utc=True)
+    return [{"lat": float(r.lat), "lon": float(r.lon),
+             "frp": round(float(r.frp), 2), "confidence": str(r.confidence),
+             "ts": str(r.ts)}
+            for r in df.sort_values("ts").itertuples()]

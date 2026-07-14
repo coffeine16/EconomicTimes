@@ -4,10 +4,12 @@ Row = (H3 cell, hour). Columns = everything we know about that cell then:
 station PM2.5 (where a station exists), satellite columns, fires within 2 km,
 weather, land-use context, time features.
 """
+import json
+
 import numpy as np
 import pandas as pd
 
-from shared.config import DATA_RAW, DATA_OUT, FIRE_RADIUS_KM
+from shared.config import DATA_RAW, DATA_OUT, FIRE_RADIUS_KM, CITY
 from shared.grid import city_cells, cell_center, latlng_to_cell, haversine_km, neighbors
 from shared.wards import attach_wards
 
@@ -142,8 +144,22 @@ def build_panel() -> pd.DataFrame:
     panel = panel.merge(_fire_features(cells, fires, hours), on=["cell", "ts"], how="left")
     panel = panel.merge(_landuse_features(cells, osm), on="cell", how="left")
 
-    # ward: the administrative key every downstream contract carries
+    # ward: the administrative key every downstream contract carries.
+    #
+    # ALSO PERSIST IT. The serving API used to recompute wards from config.CITY, which
+    # defaults to bengaluru — so serving DELHI outputs with AQ_CITY unset silently
+    # produced a Bengaluru ward map, every ward_id came back NaN, and /fusion 500'd on
+    # a NaN that is not valid JSON. The API must read what the pipeline WROTE, not
+    # re-derive it from an environment variable it cannot see.
     panel = attach_wards(panel)
+    from shared.wards import ward_frame
+    _w = ward_frame()
+    (DATA_OUT / "wards.json").write_text(json.dumps({
+        "city": CITY,
+        "synthetic": bool(_w.attrs.get("synthetic", True)),
+        "n_wards": int(_w.ward_id.nunique()),
+        "cells": _w.to_dict("records"),
+    }, indent=1))
 
     # time features
     panel["hour"] = panel.ts.dt.hour
