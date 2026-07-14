@@ -119,7 +119,10 @@ def fetch_weather(days: int | None = None) -> pd.DataFrame:
 
 
 # ----------------------------------------------------------------- FIRMS
-FIRMS_MAX_DAY_RANGE = 10   # hard cap in the FIRMS area API
+# The API enforces this and says so plainly: "Invalid day range. Expects [1..5]".
+# The web form's dropdown offers more, which is misleading. 60 days = 12 calls,
+# against a quota of 5000 per 10 minutes, so the chunking costs us nothing.
+FIRMS_MAX_DAY_RANGE = 5
 FIRMS_SOURCE = "VIIRS_SNPP_NRT"
 
 
@@ -155,9 +158,11 @@ def fetch_fires(days: int | None = None) -> pd.DataFrame:
         chunk = min(FIRMS_MAX_DAY_RANGE, (end - day).days)
         url = f"{FIRMS_URL}/{key}/{FIRMS_SOURCE}/{bbox}/{chunk}/{day.date()}"
         text = _get(url, timeout=60).decode()
-        # FIRMS returns a plain-text error body with HTTP 200 — an invalid key does
-        # NOT raise. Parsing that as CSV yields a garbage frame, so check first.
-        if not text.lstrip().lower().startswith("country_id,latitude"):
+        # FIRMS can return a plain-text error body with HTTP 200 (e.g. an invalid
+        # key), which pandas would happily parse into a garbage frame. Validate on
+        # the real header — the /area endpoint leads with `latitude,longitude`
+        # (NOT `country_id`, which is the /country endpoint's schema).
+        if "acq_date" not in text.split("\n", 1)[0]:
             head = text.strip().splitlines()[0][:120] if text.strip() else "(empty)"
             raise RuntimeError(f"FIRMS returned an error, not CSV: {head}")
         part = pd.read_csv(StringIO(text))
