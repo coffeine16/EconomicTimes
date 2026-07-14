@@ -96,6 +96,9 @@ MAX_SOURCE_KM = 8.0
 URBAN_AMP = 22.0        # ug/m3 of diffuse emission at the densest core (pre-trapping)
 URBAN_NO2 = 25.0        # the road network is a NO2 tracer -> the satellite can see it
 N_ROAD_NODES = 220      # OSM road density, sampled proportional to urban intensity
+# Per active hour. Calibrated to real FIRMS: ~18 detections over ALL of Delhi in 60
+# days. The old 0.25 gave us 281 — a gift we were giving ourselves.
+FIRE_DETECT_RATE = 0.18   # per active hour DURING an episode (VIIRS ~2 passes/day)
 URBAN_SEED = 11
 
 # Station siting. CPCB norms deliberately place monitors away from immediate
@@ -388,14 +391,57 @@ def generate_all(n_hours: int = PANEL_HOURS):
     # spatial background in cells that have no monitor.
     urban_by_cell = dict(zip(cells, W @ urban_field()))
     u = sat_df.cell.map(urban_by_cell).values
+    # INSTRUMENT NOISE, CALIBRATED TO THE REAL INSTRUMENT.
+    #
+    # This is where the old 4/4 came from, and it was our own fault. We made the
+    # SOURCES adversarial and left the SENSORS perfect: SO2 got a clean industrial
+    # signature (noise sigma 4.5 on a signal of ~60) and AAI a clean burning one. So
+    # the detector learned to trust two channels that, in reality, are noise — and
+    # scored 4/4 on a world that flattered its own instruments.
+    #
+    # Measured on real S5P over Bengaluru AND Delhi (scripts/compare_cities.py):
+    #   NO2  median  43 umol/m2, MAD  12   -> SNR 2.6-2.8   usable
+    #   SO2  median   3 umol/m2, MAD  91   -> SNR 0.66-0.87 NOISE (49% NEGATIVE)
+    #   AAI  median -0.39,       MAD 0.48  -> SNR 0.76-1.03 NOISE
+    #
+    # So SO2 and AAI now carry the noise they really carry. They stay in the schema
+    # (they are real products, and honest evidence for a human to look at) but any
+    # model that leans on them will now be punished here, exactly as it is punished
+    # in reality. Model an instrument's NOISE before you model its signal.
     sat_df["no2_col"] = (40 + 1.6 * (sat_df.b_traffic + sat_df.b_industrial)
-                         + URBAN_NO2 * u + RNG.normal(0, 9, n))
-    sat_df["so2_col"] = 10 + 1.3 * sat_df.b_industrial + RNG.normal(0, 4.5, n)
-    sat_df["aai"] = 0.4 + 0.030 * sat_df.b_burn + RNG.normal(0, 0.22, n)
+                         + URBAN_NO2 * u + RNG.normal(0, 12, n))
+    sat_df["so2_col"] = 3 + 1.3 * sat_df.b_industrial + RNG.normal(0, 135, n)
+    sat_df["aai"] = -0.39 + 0.030 * sat_df.b_burn + RNG.normal(0, 0.71, n)
     sat_df = sat_df[["cell", "date", "no2_col", "so2_col", "aai"]]
 
     # 3) FIRMS fires near burning sources during their active hours. Fires are the
     #    only direct evidence of the unregistered burning sources.
+    # FIRES ARE EPISODIC, NOT A COIN FLIP EVERY HOUR.
+    #
+    # This is the modelling error that a uniform per-hour probability hides, and it
+    # is fatal to the thing we actually detect. A landfill does not emit one
+    # independent fire per hour: it IGNITES and then BURNS FOR DAYS. Real Bhalswa
+    # burned Nov 21-27 2025 — six detections inside seven days — and it is exactly
+    # that CLUSTERING that puts fire persistence above threshold in a 7-day window.
+    #
+    # Drawn independently per hour, the same total number of fires scatters evenly
+    # across 60 days, persistence is ~0 in every window, and the detector finds
+    # nothing. Measured: 44 uniformly-scattered fires detect NOTHING; 7 clustered
+    # ones found Bhalswa. The count was never the point. The burst is.
+    episodes: dict[str, list[tuple[int, int]]] = {}
+    for name, stype, *_rest in SOURCES:
+        if stype != "waste_burning":
+            continue
+        eps, day = [], int(RNG.integers(0, 12))
+        while day < 60:
+            dur = int(RNG.integers(3, 7))            # a fire burns for 3-6 days
+            eps.append((day * 24, (day + dur) * 24))
+            day += dur + int(RNG.integers(8, 18))    # then weeks of quiet
+        episodes[name] = eps
+
+    def burning(name: str, h: int) -> bool:
+        return any(a <= h < b for a, b in episodes.get(name, []))
+
     fires = []
     n_wx = len(wx)
     for h, wx_row in enumerate(wx.itertuples(index=False)):
@@ -404,7 +450,17 @@ def generate_all(n_hours: int = PANEL_HOURS):
                 continue
             if h < int(live_from * n_wx):
                 continue
-            if RNG.random() < 0.25:
+            if not burning(name, h):
+                continue
+            # FIRE DETECTION RATE, CALIBRATED TO THE REAL SATELLITE.
+            #
+            # This was 0.25/active-hour, which produced 281 detections over 60 days.
+            # Real VIIRS passes overhead ~twice a day, and only catches a fire that
+            # happens to be burning, uncovered, at that moment: real FIRMS returns
+            # 18 detections over ALL of Delhi in 60 days, 7 of them at Bhalswa — the
+            # landfill our detector successfully found. Seven is enough. 281 was a
+            # gift we were giving ourselves.
+            if RNG.random() < FIRE_DETECT_RATE:
                 fires.append({"ts": wx_row.ts,
                               "lat": slat + RNG.normal(0, 0.004),
                               "lon": slon + RNG.normal(0, 0.004),

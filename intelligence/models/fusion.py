@@ -18,7 +18,12 @@ from sklearn.metrics import mean_squared_error, r2_score
 
 from shared.config import DATA_OUT
 
-FEATURES = ["no2_col", "so2_col", "aai",                 # satellite
+# SO2 and AAI are NOT features. They are noise (SNR 0.7-1.0 on real S5P; see
+# detect.py::POLLUTANTS). On real Delhi, `aai` came back as the model's #2 feature
+# by gain — i.e. LightGBM was busily fitting retrieval error, and LOSO R2 collapsed
+# from 0.90 (synthetic) to 0.48. A tree ensemble handed a noise column WILL find
+# structure in it, and will generalise worse for having done so.
+FEATURES = ["no2_col",                                   # satellite (NO2 only)
             "wind_from_deg", "wind_ms", "blh_m", "temp_c",  # meteorology
             "fires_6h", "frp_6h",                         # fire activity
             "lu_industrial", "lu_construction", "lu_waste_burning", "lu_traffic",  # land use
