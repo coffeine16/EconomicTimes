@@ -100,22 +100,38 @@ def fetch_fires() -> pd.DataFrame:
 def fetch_osm() -> pd.DataFrame:
     """One Overpass bbox query: industry, construction, kilns, trunk roads, schools, hospitals."""
     bbox = f'{BBOX["lat_min"]},{BBOX["lon_min"]},{BBOX["lat_max"]},{BBOX["lon_max"]}'
+    # NOTE ON THE OUTPUT LIMIT: this used to end `out center 4000;`, and a real
+    # Bengaluru fetch returns ~3,900 features — i.e. it was pinned against the cap
+    # and silently truncating, with *which* features survived decided by whatever
+    # Overpass happened to emit first. A missing industrial polygon is a source
+    # attribution can never name. Uncapped.
+    #
+    # The amenity regex is anchored: `~"school|hospital"` is a substring match and
+    # was pulling in driving_school, music_school, dancing_school... A driving
+    # school is not a room full of children, and this layer feeds the vulnerability
+    # term that decides whether a hotspot outranks another one.
     query = f"""
-    [out:json][timeout:90];
+    [out:json][timeout:180];
     (
       way["landuse"="industrial"]({bbox});
       way["landuse"="construction"]({bbox});
       node["man_made"="kiln"]({bbox});
       way["landuse"="landfill"]({bbox});
-      way["highway"~"trunk|motorway|primary"]({bbox});
-      node["amenity"~"school|hospital"]({bbox});
-      way["amenity"~"school|hospital"]({bbox});
+      way["highway"~"^(trunk|motorway|primary)$"]({bbox});
+      node["amenity"~"^(school|hospital)$"]({bbox});
+      way["amenity"~"^(school|hospital)$"]({bbox});
     );
-    out center 4000;
+    out center;
     """
-    data = urllib.request.urlopen(
-        urllib.request.Request(OVERPASS_URL, data=urllib.parse.urlencode({"data": query}).encode()),
-        timeout=120).read()
+    # Overpass returns 406 Not Acceptable to a request with no User-Agent. urllib's
+    # default ("Python-urllib/3.x") is rejected outright, which is why this quietly
+    # fell back to synthetic OSM on every live run.
+    req = urllib.request.Request(
+        OVERPASS_URL,
+        data=urllib.parse.urlencode({"data": query}).encode(),
+        headers={"User-Agent": "aq-intelligence-platform/0.1 (civic air quality research)",
+                 "Accept": "application/json"})
+    data = urllib.request.urlopen(req, timeout=180).read()
     rows = []
     for el in json.loads(data)["elements"]:
         lat = el.get("lat") or el.get("center", {}).get("lat")
@@ -149,6 +165,27 @@ def fetch_s5p() -> pd.DataFrame:
 REAL = {"stations": fetch_stations, "weather": fetch_weather,
         "fires": fetch_fires, "osm": fetch_osm, "satellite": fetch_s5p}
 
+# Sources that may NOT silently degrade to synthetic in live mode, and why.
+#
+# The test is not "is this source important" — it is "would a synthetic version of
+# this INVENT A PLACE that we would then accuse". Anything feeding detection or
+# attribution names locations, and a fabricated location becomes a real inspector
+# knocking on a real door.
+#
+# `stations` is deliberately NOT on this list: it feeds the fusion EXPOSURE map, not
+# the detector, so a synthetic station degrades an estimate rather than fabricating
+# an accusation. It still warns.
+NO_FALLBACK = {
+    "satellite": "Detection runs on satellite NO2 contrast. A synthetic satellite "
+                 "carries nine invented sources at invented coordinates.",
+    "fires":     "FIRMS fire persistence is HALF the detector, and it is what locates "
+                 "the unregistered burning sources — our headline result. Synthetic "
+                 "fires are invented fires at invented coordinates.",
+    "osm":       "OSM supplies the named candidates attribution accuses, and decides "
+                 "whether a zone is enforceable at all. Synthetic OSM is a list of "
+                 "factories that do not exist.",
+}
+
 
 def run(synthetic: bool = False) -> dict:
     out = {}
@@ -179,16 +216,16 @@ def run(synthetic: bool = False) -> dict:
                 #
                 # Failing loudly is the only honest option. Use --synthetic to run
                 # the whole world offline, which is coherent, or fix GEE auth.
-                if name == "satellite":
+                if name in NO_FALLBACK:
                     raise RuntimeError(
-                        f"Sentinel-5P fetch failed ({type(e).__name__}: {e}).\n"
-                        f"REFUSING to substitute a synthetic satellite in live mode: "
-                        f"detection runs entirely on this layer, and pairing invented "
-                        f"sources with real stations would fabricate accusations "
-                        f"against real places.\n"
-                        f"Either fix GEE auth (`gcloud auth application-default login`, "
-                        f"and see docs/gcp-setup.md), or run the whole world offline "
-                        f"with --synthetic."
+                        f"{name} fetch failed in LIVE mode ({type(e).__name__}: {e}).\n\n"
+                        f"REFUSING to substitute synthetic {name}. {NO_FALLBACK[name]}\n\n"
+                        f"Substituting it would mean naming polluters that do not exist, "
+                        f"in a real city, on a real map — a fabricated output, not a "
+                        f"degraded one.\n"
+                        f"Fix the source, or run the whole world offline with --synthetic "
+                        f"(which is coherent, because everything in it is invented "
+                        f"together)."
                     ) from e
                 if synth is None:
                     synth = generate_all()
