@@ -84,9 +84,15 @@ export const api = {
   getWards: () => apiFetch<WardsResponse>("/wards"),
   getLoso: () => apiFetch<LOSOResponse>("/loso"),
 
-  // ─── Not-yet-built endpoints (return null gracefully) ────────────────────────
+  // ─── Not-yet-built endpoints (return empty gracefully) ───────────────────────────────────
+  // Forecast: FORECAST_WEIGHT = 0.0 until forecast agent is built.
+  // severity = clip(base_severity + 0.0 * forecast_delta, 0, 1)
+  // A zero we can explain beats a number we invented.
   getForecast: (horizon: 24 | 48 | 72 = 24) =>
     apiFetch<ForecastCell[]>(`/forecast?h=${horizon}`).catch(() => [] as ForecastCell[]),
+
+  // Actions: zone-level (NOT cell-level). ~4–5 zones, not 74 cells.
+  // Only attributable:true zones appear here (diffuse excluded from queue).
   getActions: () =>
     apiFetch<Action[]>("/actions").catch(() => [] as Action[]),
   getDispatch: () =>

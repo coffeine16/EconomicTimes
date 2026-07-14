@@ -1,1 +1,44 @@
-[]
+[
+  {
+    "action_id": "A01",
+    "zone_id": "Z01",
+    "ward_id": "W042",
+    "ward_name": "Bommasandra",
+    "cells": ["884430a565fffff", "884430a565bffff", "884430a565dffff"],
+    "centroid": { "lat": 12.834, "lon": 77.614 },
+    "eps": 87.2,
+    "components": {
+      "severity": 0.82,
+      "attribution_conf": 0.82,
+      "actionability": 0.60,
+      "vulnerability": 0.40
+    },
+    "kind": "chronic",
+    "source": "waste_burning",
+    "confidence": 0.82,
+    "n_cells": 3,
+    "pm25_med": 142.3,
+    "status": "pending"
+  },
+  {
+    "action_id": "A02",
+    "zone_id": "Z02",
+    "ward_id": "W018",
+    "ward_name": "Peenya Industrial Area",
+    "cells": ["884430a567fffff", "884430a567bffff"],
+    "centroid": { "lat": 13.028, "lon": 77.516 },
+    "eps": 72.1,
+    "components": {
+      "severity": 0.67,
+      "attribution_conf": 0.71,
+      "actionability": 0.64,
+      "vulnerability": 0.30
+    },
+    "kind": "emerging",
+    "source": "industrial",
+    "confidence": 0.71,
+    "n_cells": 2,
+    "pm25_med": 98.7,
+    "status": "pending"
+  }
+]

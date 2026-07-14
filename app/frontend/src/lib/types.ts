@@ -19,12 +19,11 @@ export interface WardsResponse {
 // ─── Fusion Field ─────────────────────────────────────────────────────────────
 
 export interface FusionCell {
+  // ⚠ The field is `pm25`, NOT `pm25_hat`. No prediction interval is computed.
+  // Source: architecture.md data contracts ("pm25, NOT pm25_hat").
   cell: string;
   ward_id: string;
-  pm25: number;       // pm25_hat from the model
-  interval?: number;
-  hour?: string;      // ISO timestamp
-  ts?: string;
+  pm25: number;
 }
 
 export interface FusionResponse {
@@ -115,34 +114,54 @@ export interface Attribution {
 }
 
 // ─── Action Queue (EPS) ───────────────────────────────────────────────────────
+// An ACTION is a ZONE, not a cell. ~5 zones, not 74 cells.
+// `legal_basis` is deliberately absent — that belongs to the memo agent.
+// Source: eps-spec.md output contract + architecture.md data contracts.
 
 export type ActionStatus = "pending" | "dispatched" | "actioned" | "resolved";
 
 export interface EPSComponents {
-  severity: number;
-  attribution_conf: number;
-  actionability: number;
-  vulnerability: number;
+  severity: number;           // [0,1] max across zone's cells
+  attribution_conf: number;   // [0,1] max over zone's cells
+  actionability: number;      // [0,1] base × kind_weight × locatable
+  vulnerability: number;      // [0,1] min(school+hospital count / 5, 1.0)
+}
+
+export interface ZoneCentroid {
+  lat: number;
+  lon: number;
 }
 
 export interface Action {
   action_id: string;
-  cell: string;
-  ward: string;
-  eps: number;
+  zone_id: string;            // e.g. "Z00" — group key from hotspots.json
+  ward_id: string;
+  ward_name: string;
+  cells: string[];            // all H3 cells belonging to this zone
+  centroid: ZoneCentroid;     // lat/lon for map pin and dispatch routing
+  eps: number;                // 0–100
   components: EPSComponents;
-  source: SourceCategory;
-  legal_basis: string;
+  kind: HotspotKind;          // chronic | emerging | acute
+  source: SourceCategory;     // from attribution
+  confidence: number;         // attribution confidence [0,1]
+  n_cells: number;            // zone size
+  pm25_med: number;           // median PM2.5 across zone cells
   status: ActionStatus;
+  // NOTE: forecast_delta is 0 until the forecast agent is built.
+  // severity = clip(base_severity + FORECAST_WEIGHT * forecast_delta, 0, 1)
+  // FORECAST_WEIGHT = 0.0 for now — a zero we can explain beats a number we invented.
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
 export interface DispatchStop {
   seq: number;
-  cell: string;
-  ward: string;
+  action_id: string;   // links back to actions.json
+  zone_id: string;
+  ward_id: string;
   eps: number;
+  lat: number;         // centroid lat — frontend draws route without resolving cells
+  lon: number;         // centroid lon
 }
 
 export interface DispatchRoute {
@@ -192,7 +211,7 @@ export interface SensorFlag {
 export interface AuditResponse {
   blind_spots: BlindSpot[];
   sensor_flags: SensorFlag[];
-  placement_recommendations: BlindSpot[];
+  placement_recommendations: string[];
 }
 
 // ─── LOSO Validation ──────────────────────────────────────────────────────────

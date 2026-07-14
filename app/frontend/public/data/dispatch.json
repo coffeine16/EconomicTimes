@@ -1,1 +1,27 @@
-[]
+[
+  {
+    "team_id": "T1",
+    "route_km": 18.4,
+    "coverage_pct": 63.0,
+    "stops": [
+      {
+        "seq": 1,
+        "action_id": "A01",
+        "zone_id": "Z01",
+        "ward_id": "W042",
+        "eps": 87.2,
+        "lat": 12.834,
+        "lon": 77.614
+      },
+      {
+        "seq": 2,
+        "action_id": "A02",
+        "zone_id": "Z02",
+        "ward_id": "W018",
+        "eps": 72.1,
+        "lat": 13.028,
+        "lon": 77.516
+      }
+    ]
+  }
+]
