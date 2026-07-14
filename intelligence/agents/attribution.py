@@ -111,13 +111,26 @@ def category_scores(ev: dict) -> dict:
     hour = ev["meteorology"]["hour_local"]
     if sig.get("no2_col", {}).get("city_percentile", 0) >= 80 and (7 <= hour <= 10 or 17 <= hour <= 20):
         s["traffic"] += 0.8
-    # Fire evidence is scored on the FRACTION of the window that was burning, not
-    # a raw count: a count is not comparable across a 6-hour acute window and a
-    # 30-day chronic one. Sustained burning is what distinguishes a landfill from
-    # somebody's bonfire.
+    # FIRE IS DIRECT OBSERVATION, AND IT OUTRANKS INFERENCE.
+    #
+    # Every other term in this function is an *inference* — this site is near, the
+    # wind points that way, the land use looks industrial. A FIRMS thermal anomaly is
+    # not an inference: it is a satellite measuring heat. Something is on fire, at
+    # that place, right then.
+    #
+    # It used to cap at 1.4 while a construction site at zero distance could reach
+    # 1.45 (candidate 1.0 + land-use 0.45) — so proximity to a building site could
+    # out-argue a satellite watching the ground burn. Measured: it mislabelled one of
+    # our two burning sources, and on real Delhi it was part of why Okhla came back
+    # as `traffic`.
+    #
+    # Scored on the FRACTION of the window burning, not a raw count: a count is not
+    # comparable across a 6-hour acute window and a 30-day chronic one. Sustained
+    # burning is what separates a landfill from somebody's bonfire — so a single
+    # detection stays modest (1.0), and persistent burning becomes decisive (3.0).
     frac = ev["fire_activity"]["fire_hour_fraction"]
     if frac > 0:
-        s["waste_burning"] += 0.6 + 0.8 * min(frac / 0.15, 1.0)
+        s["waste_burning"] += 1.0 + 2.0 * min(frac / 0.10, 1.0)
     for k in CATEGORIES:
         s[k] += 0.15 * min(ev["landuse_context"][k], 3)
     if 8 <= hour <= 18:
@@ -170,6 +183,13 @@ def confidence_from(scores: dict, ev: dict, top: str) -> float:
     strength = float(np.clip(vals[0] / 2.0, 0, 1))
     agreement = independent_signals(ev, top) / 4.0
     conf = 0.10 + 0.30 * margin + 0.30 * strength + 0.30 * agreement
+
+    # IGNORANCE GATE. Margin is a RATIO, so when every rival scores 0 it reads 1.0 —
+    # a top score of 0.06 against three zeros looked as decisive as a top score of
+    # 3.0, and returned 0.48. That is near-total ignorance wearing the face of
+    # moderate certainty, and it is the exact failure a confidence number exists to
+    # prevent. Scale the whole thing by how much evidence there actually IS.
+    conf *= min(1.0, vals[0] / 0.5)
     return round(float(np.clip(conf, 0.05, 0.95)), 2)
 
 
@@ -238,7 +258,12 @@ def attribute_one(ev: dict) -> dict:
 # The evidence window must match the CLAIM being made. Attributing a standing
 # violator off one hour of wind is how you name the wrong factory; attributing a
 # fire off a 30-day median is how you miss it entirely.
-WINDOW_HOURS = {"chronic": 24 * 30, "emerging": 24 * 7, "acute": 6}
+# The evidence window MUST match the detection window that fired. `acute` used to
+# reason over 6 hours while detection fires it off the 24h channel — so a kiln
+# detected on a fire in the last 24h was explained using an evidence window that
+# contained no fire at all, scored 0.00 on every category, and was labelled
+# `traffic` on a residue of 0.06. Explain a hotspot with the evidence that caused it.
+WINDOW_HOURS = {"chronic": 24 * 30, "emerging": 24 * 7, "acute": 24}
 
 
 def run(top_n: int = 100) -> list[dict]:
@@ -257,11 +282,30 @@ def run(top_n: int = 100) -> list[dict]:
     panel = panel.merge(field, on=["cell", "ts"], how="left")
     sat_pct = {c: np.sort(panel[c].dropna().values) for c in ("no2_col", "so2_col", "aai")}
 
-    out = []
+    # ATTRIBUTE ONE ZONE, NOT ONE CELL.
+    #
+    # A zone IS a source. Attributing its cells independently produced one zone whose
+    # 11 cells carried three different labels — an incoherent case file, and worse: a
+    # burning source's FRINGE cells sit 2 km out where `fires_6h` is 0, so fire
+    # evidence never reached them and a nearby construction site out-argued a
+    # satellite watching the ground burn. (Measured: it cost us 1 of 2 correct names.)
+    #
+    # Same bug we already fixed in detection — persistence is a property of a SOURCE,
+    # not a cell — which had simply survived over here. Evidence is now pooled across
+    # the zone: fire ANYWHERE in the zone is fire evidence FOR the zone, and every
+    # cell inherits the one verdict.
+    by_zone: dict[str, list[dict]] = {}
     for h in hotspots:
-        ts = pd.Timestamp(h["ts"])
-        kind = h.get("kind", "chronic")
-        w = panel[(panel.cell == h["cell"])
+        by_zone.setdefault(h.get("zone_id") or h["cell"], []).append(h)
+
+    out = []
+    for zone_id, cells in by_zone.items():
+        anchor = max(cells, key=lambda h: h["severity"])   # the zone's worst cell
+        ts = pd.Timestamp(anchor["ts"])
+        kind = anchor.get("kind", "chronic")
+        cell_ids = [h["cell"] for h in cells]
+
+        w = panel[(panel.cell.isin(cell_ids))
                   & (panel.ts > ts - pd.Timedelta(hours=WINDOW_HOURS[kind]))
                   & (panel.ts <= ts)]
         if w.empty:
@@ -272,19 +316,29 @@ def run(top_n: int = 100) -> list[dict]:
         row = w.median(numeric_only=True)
         row["hour"] = 12 if kind != "acute" else int(ts.hour)
 
-        fires_hours = int((w.fires_6h > 0).sum())
+        # Fire is pooled over the zone by its BURNIEST cell, not averaged: a landfill
+        # burns at the landfill, not evenly across the 2 km blob it lights up.
+        per_cell = w.groupby("cell").fires_6h.apply(lambda s: (s > 0).mean())
+        frac = float(per_cell.max()) if len(per_cell) else 0.0
         fire_activity = {
-            "fire_hours": fires_hours,
-            "fire_hour_fraction": round(fires_hours / len(w), 4),
+            "fire_hours": int((w[w.cell == per_cell.idxmax()].fires_6h > 0).sum()) if len(per_cell) else 0,
+            "fire_hour_fraction": round(frac, 4),
             "frp_p90": round(float(w.frp_6h.quantile(0.9)), 1),
         }
-        ev = build_evidence(h["cell"], ts, row, osm, sat_pct, fire_activity,
+
+        ev = build_evidence(anchor["cell"], ts, row, osm, sat_pct, fire_activity,
                             wind_hist=w.wind_from_deg.tolist())
         ev["hotspot_kind"] = kind
         ev["evidence_window_hours"] = WINDOW_HOURS[kind]
-        rec = attribute_one(ev)
-        rec["zone_id"] = h.get("zone_id")
-        out.append(rec)
+        ev["zone_cells"] = len(cell_ids)
+        verdict = attribute_one(ev)
+
+        # every cell in the zone inherits the ONE verdict (the API is keyed by cell)
+        for h in cells:
+            rec = dict(verdict)
+            rec["cell"] = h["cell"]
+            rec["zone_id"] = zone_id
+            out.append(rec)
 
     (DATA_OUT / "attributions.json").write_text(json.dumps(out, indent=2))
     if out:
