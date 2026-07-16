@@ -280,7 +280,7 @@ def detect(at: pd.Timestamp | None = None) -> pd.DataFrame:
                 **{k: round(float(r[k]), 2) for k in
                    ("pm25_med", "z_w24h", "z_w7d", "z_w30d", "nearest_candidate_km")}}
                for r in out.to_dict("records")]
-    (DATA_OUT / "hotspots.json").write_text(json.dumps(payload, indent=2))
+    (DATA_OUT / "hotspots.json").write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
     if len(out):
         n_enf = int(out.attributable.sum())

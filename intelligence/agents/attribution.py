@@ -340,7 +340,7 @@ def run(top_n: int = 100) -> list[dict]:
             rec["zone_id"] = zone_id
             out.append(rec)
 
-    (DATA_OUT / "attributions.json").write_text(json.dumps(out, indent=2))
+    (DATA_OUT / "attributions.json").write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     if out:
         by_src = pd.Series([o["primary_source"] for o in out]).value_counts().to_dict()
         prov = pd.Series([o["explained_by"] for o in out]).value_counts().to_dict()

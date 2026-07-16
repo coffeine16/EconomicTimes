@@ -310,7 +310,7 @@ def run() -> list[dict]:
             continue
         memos.append(generate_memo(a, att))
 
-    (DATA_OUT / "memos.json").write_text(json.dumps(memos, indent=2))
+    (DATA_OUT / "memos.json").write_text(json.dumps(memos, indent=2, ensure_ascii=False), encoding="utf-8")
     by_prov = pd.Series([m["drafted_by"] for m in memos]).value_counts().to_dict()
     print(f"[memo] {len(memos)} memos written (prose by {by_prov})")
     for m in memos:

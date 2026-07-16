@@ -49,6 +49,7 @@ def main():
     from intelligence.agents.attribution import run as attribute_run
     from intelligence.models.forecast import run as forecast_run
     from intelligence.agents.memo import run as memo_run
+    from intelligence.agents.advisory import run as advisory_run
 
     print(RULE)
     detect()
@@ -60,6 +61,8 @@ def main():
     prioritise_run()
     print(RULE)
     memo_run()
+    print(RULE)
+    advisory_run()
     print(RULE)
     print("Full pipeline complete. Evaluate with:")
     print("  python scripts/eval_detection.py     # the headline stat: sources found vs missed")

@@ -27,10 +27,17 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 
 def _json(name: str):
+    """Read a precomputed contract. UTF-8 EXPLICITLY.
+
+    read_text() uses the platform default, which on Windows is cp1252 — it raises
+    UnicodeDecodeError the moment an advisory contains Kannada or Hindi. The citizen
+    endpoints are the whole point of the language-coverage work, so this is not
+    optional.
+    """
     p = DATA_OUT / name
     if not p.exists():
         raise HTTPException(404, f"{name} not generated yet — run the pipeline first")
-    return json.loads(p.read_text())
+    return json.loads(p.read_text(encoding="utf-8"))
 
 
 @app.get("/health")
@@ -130,6 +137,21 @@ def forecast(h: int | None = None):
 def forecast_eval():
     """RMSE at each horizon vs persistence + diurnal baselines. The rubric's number."""
     return _json("forecast_eval.json")
+
+
+@app.get("/advisories")
+def advisories():
+    """Ward health advisories, ranked by risk. Multi-language."""
+    return _json("advisories.json")
+
+
+@app.get("/ward/{ward_id}/summary")
+def ward_summary(ward_id: str):
+    """The citizen view: my ward's air, my forecast, my advisory in my language."""
+    for a in _json("advisories.json"):
+        if a["ward_id"] == ward_id:
+            return a
+    raise HTTPException(404, f"no advisory for ward {ward_id}")
 
 
 @app.get("/memos")
