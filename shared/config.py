@@ -41,6 +41,7 @@ _load_dotenv()
 CITIES = {
     "bengaluru": {"lat_min": 12.85, "lat_max": 13.10, "lon_min": 77.45, "lon_max": 77.75},
     "delhi":     {"lat_min": 28.45, "lat_max": 28.75, "lon_min": 76.95, "lon_max": 77.35},
+    "chennai":   {"lat_min": 12.95, "lat_max": 13.20, "lon_min": 80.12, "lon_max": 80.32},
 }
 CITY = os.environ.get("AQ_CITY", "bengaluru").lower()
 if CITY not in CITIES:

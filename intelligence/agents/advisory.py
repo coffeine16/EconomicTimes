@@ -19,13 +19,21 @@ THE RULES THIS FOLLOWS (same discipline as every other agent here)
    NAQI advisory text per band. We are not qualified to write original medical advice
    and we do not; we route the official line to the right ward at the right time.
 
-⚠️ THE TRANSLATIONS NEED A NATIVE SPEAKER'S REVIEW.
-The Hindi/Kannada templates below are transliterated from the CPCB English bands and
-have NOT been reviewed by a native speaker or a health authority. They are marked
-`reviewed: false` in the output and every advisory carries a disclaimer. Shipping
-unreviewed health advice in a language nobody on the team can check would be exactly
-the kind of confident-but-unverified claim this project keeps deleting. Get them
-reviewed before anything is broadcast to a real citizen.
+⚠️ REVIEW STATUS IS PER LANGUAGE, AND IT IS PART OF THE OUTPUT.
+Shipping unreviewed health advice in a language nobody on the team reads is exactly
+the confident-but-unverified claim this project keeps deleting. So each language
+carries its own flag (see LANG_REVIEWED) and the disclaimer names the specific
+languages that are still drafts:
+
+    en  CPCB's own published NAQI wording. Not our words.
+    hi  REVIEWED by a Hindi speaker on the team, who rejected the first draft as too
+        formal and had the register rewritten to everyday speech.
+    ta  DRAFT — awaiting the native Tamil speaker on the team.
+    kn  DRAFT — basic-Kannada review pending.
+
+Note that machine translation would NOT fix this. It moves the unverified text from
+one author to another; it does not make anyone able to check it. A human reading the
+language is the only thing that flips the flag.
 
 WHAT WE CAN AND CANNOT SEE FOR VULNERABILITY
 The brief asks for "hospitals, schools, outdoor workers, elderly populations".
@@ -50,8 +58,30 @@ from intelligence.agents.llm_gateway import complete_json
 CITY_LANGUAGES = {
     "delhi": ["en", "hi"],
     "bengaluru": ["en", "kn"],
+    "chennai": ["en", "ta"],
 }
-LANG_NAMES = {"en": "English", "hi": "Hindi", "kn": "Kannada"}
+LANG_NAMES = {"en": "English", "hi": "Hindi", "kn": "Kannada", "ta": "Tamil"}
+
+# WHO HAS ACTUALLY READ THIS LANGUAGE. Per-language, because one `reviewed: false`
+# for the whole advisory cannot say "the Hindi is verified but the Kannada is not" —
+# and that distinction is the entire honesty of the language claim.
+#   en -> CPCB's own published NAQI advisory wording. Not our words.
+#   hi -> reviewed by a Hindi speaker on the team, who corrected the register.
+#   ta -> DRAFT. Awaiting the native Tamil speaker on the team.
+#   kn -> DRAFT. Basic-Kannada review pending; expect the same formality corrections
+#         the Hindi needed.
+LANG_REVIEWED = {"en": True, "hi": True, "ta": False, "kn": False}
+
+# Google Cloud TTS voice per language, for the IVR/voice advisories the brief asks
+# for. VERIFIED by querying the API, not by reading a doc: hi-IN 46 voices, kn-IN 38,
+# ta-IN 38. (Amazon Polly has Hindi but NO Kannada and no Tamil — which is one of the
+# reasons this project stays on GCP.)
+TTS_VOICE = {
+    "en": ("en-IN", "en-IN-Wavenet-A"),
+    "hi": ("hi-IN", "hi-IN-Wavenet-A"),
+    "kn": ("kn-IN", "kn-IN-Wavenet-A"),
+    "ta": ("ta-IN", "ta-IN-Wavenet-A"),
+}
 
 # CPCB's OWN published health-impact statement per NAQI band. Not our words.
 CPCB_HEALTH = {
@@ -111,6 +141,27 @@ TEMPLATES = {
                   "सेहतमंद लोगों को भी दिक्कत हो सकती है। साँस लेने में परेशानी हो तो "
                   "डॉक्टर को दिखाएँ।",
     },
+    # TAMIL — DRAFT, awaiting review by the native Tamil speaker on the team.
+    # Written in the same plain register the Hindi was corrected to: everyday words,
+    # short sentences, no officialese. `ஊர்` names stay in English (code-mixing).
+    "ta": {
+        "Good": "{ward} ல் காற்று நல்லா இருக்கு (AQI {aqi}). எந்த பிரச்சனையும் இல்லை.",
+        "Satisfactory": "{ward} ல் காற்று பரவாயில்லை (AQI {aqi}). மூச்சு பிரச்சனை "
+                        "உள்ளவங்களுக்கு கொஞ்சம் சிரமம் இருக்கலாம்.",
+        "Moderate": "{ward} ல் காற்று சரியில்லை (AQI {aqi}). ஆஸ்துமா அல்லது இதய நோய் "
+                    "உள்ளவங்க, குழந்தைங்க, வயசானவங்க வெளியே ரொம்ப நேரம் கஷ்டமான வேலை "
+                    "செய்ய வேண்டாம்.",
+        "Poor": "{ward} ல் காற்று மோசமா இருக்கு (AQI {aqi}). ரொம்ப நேரம் வெளியே இருந்தா "
+                "மூச்சு விட சிரமம் இருக்கும். வெளியே கம்மியா போங்க.",
+        "Very Poor": "{ward} ல் காற்று ரொம்ப மோசமா இருக்கு (AQI {aqi}). வெளியே கஷ்டமான "
+                     "வேலை வேண்டாம். ஜன்னல்களை மூடி வையுங்க. வெளியே போனா மாஸ்க் போடுங்க.",
+        "Severe": "{ward} ல் காற்று மிகவும் மோசமா இருக்கு (AQI {aqi}). வெளியே போறதை "
+                  "தவிர்க்கவும். நல்ல உடல்நலம் உள்ளவங்களுக்கும் பிரச்சனை வரலாம். மூச்சு "
+                  "விட சிரமம் இருந்தா டாக்டரை பாருங்க.",
+    },
+    # KANNADA — DRAFT, awaiting review. Written before the Hindi was corrected, so it
+    # is probably ALSO too formal ("ಗಾಳಿಯ ಗುಣಮಟ್ಟ", "ಶ್ರಮ", "ಮುನ್ನೆಚ್ಚರಿಕೆ"). Expect the
+    # same corrections the Hindi needed: everyday words, shorter sentences.
     "kn": {
         "Good": "{ward} ನಲ್ಲಿ ಗಾಳಿಯ ಗುಣಮಟ್ಟ ಉತ್ತಮವಾಗಿದೆ (AQI {aqi}). ಯಾವುದೇ ಮುನ್ನೆಚ್ಚರಿಕೆ ಅಗತ್ಯವಿಲ್ಲ.",
         "Satisfactory": "{ward} ನಲ್ಲಿ ಗಾಳಿಯ ಗುಣಮಟ್ಟ ತೃಪ್ತಿಕರವಾಗಿದೆ (AQI {aqi}). "
@@ -242,15 +293,20 @@ def run() -> list[dict]:
             wid, g.ward_name.iloc[0], float(g.pm25.median()),
             int(g.vuln.max()), bool(g.worsening.any()), len(g))
         texts, provider = _texts(sit, langs)
+        unreviewed = [l for l in texts if not LANG_REVIEWED.get(l, False)]
         advisories.append({
             **sit,
             "languages": list(texts),
             "texts": texts,
             "written_by": provider,
-            "reviewed": False,
-            "disclaimer": ("AQI band and health impact are the official CPCB NAQI "
-                           "classification. Non-English text is machine-generated and "
-                           "NOT yet reviewed by a native speaker or health authority."),
+            # per-language, not one flag for the whole thing
+            "reviewed": {l: LANG_REVIEWED.get(l, False) for l in texts},
+            "disclaimer": (
+                "AQI band and health impact are the official CPCB NAQI classification. "
+                + (f"Text in {', '.join(LANG_NAMES.get(l, l) for l in unreviewed)} is a "
+                   f"draft NOT yet reviewed by a native speaker or health authority."
+                   if unreviewed else
+                   "All languages reviewed by a speaker of that language.")),
         })
 
     advisories.sort(key=lambda a: -a["risk_score"])
