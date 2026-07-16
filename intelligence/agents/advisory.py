@@ -26,10 +26,11 @@ carries its own flag (see LANG_REVIEWED) and the disclaimer names the specific
 languages that are still drafts:
 
     en  CPCB's own published NAQI wording. Not our words.
-    hi  REVIEWED by a Hindi speaker on the team, who rejected the first draft as too
-        formal and had the register rewritten to everyday speech.
-    ta  DRAFT — awaiting the native Tamil speaker on the team.
-    kn  DRAFT — basic-Kannada review pending.
+    hi  REVIEWED — a Hindi speaker on the team rejected the first draft as too formal
+        and the register was rewritten to everyday speech.
+    ta  REVIEWED — the team's NATIVE Tamil speaker confirmed the everyday register
+        reads correctly. Approved unchanged.
+    kn  DRAFT — nobody on this team reads Kannada. Ships flagged. See LANG_REVIEWED.
 
 Note that machine translation would NOT fix this. It moves the unverified text from
 one author to another; it does not make anyone able to check it. A human reading the
@@ -66,11 +67,23 @@ LANG_NAMES = {"en": "English", "hi": "Hindi", "kn": "Kannada", "ta": "Tamil"}
 # for the whole advisory cannot say "the Hindi is verified but the Kannada is not" —
 # and that distinction is the entire honesty of the language claim.
 #   en -> CPCB's own published NAQI advisory wording. Not our words.
-#   hi -> reviewed by a Hindi speaker on the team, who corrected the register.
-#   ta -> DRAFT. Awaiting the native Tamil speaker on the team.
-#   kn -> DRAFT. Basic-Kannada review pending; expect the same formality corrections
-#         the Hindi needed.
-LANG_REVIEWED = {"en": True, "hi": True, "ta": False, "kn": False}
+#   hi -> REVIEWED by a Hindi speaker on the team, who rejected the first draft as too
+#         formal; the register was rewritten to everyday speech.
+#   ta -> REVIEWED by the team's NATIVE Tamil speaker, who confirmed the everyday
+#         register reads correctly. Approved unchanged.
+#   kn -> STILL A DRAFT. NOBODY ON THIS TEAM READS KANNADA.
+#
+# The Kannada is the one language we cannot verify, and it is worth knowing exactly
+# why we distrust it: it was written before the Hindi was corrected, and it still uses
+# ಗಾಳಿಯ ಗುಣಮಟ್ಟ / ಶ್ರಮ / ಚಟುವಟಿಕೆ — the structural twins of वायु गुणवत्ता / परिश्रम /
+# गतिविधि, every one of which the Hindi reviewer rejected as too formal for the people
+# this advisory exists to reach. The Tamil, written AFTER that lesson in deliberately
+# plain register, passed a native review first time. That pattern is evidence the
+# Kannada has the same defect — but evidence is not verification, so it ships flagged.
+#
+# Machine translation would NOT fix this. It changes the author, not the verifiability.
+# Find a Kannada speaker; it is ten minutes of their time.
+LANG_REVIEWED = {"en": True, "hi": True, "ta": True, "kn": False}
 
 # Google Cloud TTS voice per language, for the IVR/voice advisories the brief asks
 # for. VERIFIED by querying the API, not by reading a doc: hi-IN 46 voices, kn-IN 38,
@@ -98,7 +111,7 @@ CPCB_HEALTH = {
 
 # Rule-based advisory templates. THESE ARE THE FALLBACK AND THE DEFAULT — the LLM only
 # rewrites them more warmly if a key happens to be present.
-# hi/kn are UNREVIEWED transliterations of the CPCB English. See the module warning.
+# Review status per language lives in LANG_REVIEWED, and is emitted per advisory.
 TEMPLATES = {
     "en": {
         "Good": "Air quality in {ward} is good (AQI {aqi}). No precautions needed.",
