@@ -50,6 +50,7 @@ def main():
     from intelligence.models.forecast import run as forecast_run
     from intelligence.agents.memo import run as memo_run
     from intelligence.agents.advisory import run as advisory_run
+    from intelligence.agents.voice import run as voice_run
 
     print(RULE)
     detect()
@@ -63,6 +64,8 @@ def main():
     memo_run()
     print(RULE)
     advisory_run()
+    print(RULE)
+    voice_run()          # text advisories -> MP3 (best-effort; never fails the run)
     print(RULE)
     print("Full pipeline complete. Evaluate with:")
     print("  python scripts/eval_detection.py     # the headline stat: sources found vs missed")
