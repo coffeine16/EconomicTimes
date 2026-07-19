@@ -1,0 +1,12 @@
+# TLS via DuckDNS: a free subdomain (ours: see deploy/README.md) pointed at the
+# static IP. Telegram requires valid HTTPS for webhooks; Let's Encrypt issues the
+# cert through the plain HTTP-01 challenge on port 80 — no DNS plugin and no
+# DuckDNS token ever touches the VM. Because the IP is STATIC, DuckDNS is set
+# once; the updater cron that dynamic-IP tutorials add is unnecessary here.
+#
+# Why DuckDNS over sslip.io: duckdns.org is on the Public Suffix List, so every
+# subdomain gets its OWN Let's Encrypt rate-limit bucket. sslip.io is one shared
+# domain that routinely exhausts LE limits and stalls issuance.
+{$N8N_DOMAIN} {
+    reverse_proxy n8n:5678
+}

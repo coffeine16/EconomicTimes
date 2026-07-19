@@ -13,3 +13,9 @@ data/outputs/*
 secrets/
 *-service-account.json
 *.pem
+
+# Terraform (state records resource details; never commit it)
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfplan
