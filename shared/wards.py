@@ -65,9 +65,19 @@ def _ring_bbox(polys: list) -> tuple[float, float, float, float]:
 
 
 def _ward_name(props: dict, idx: int) -> str:
-    for k in ("KGISWardName", "ward_name", "WARD_NAME", "name", "Name", "ward"):
+    # Key list grown per real file: BBMP uses KGISWardName, Datameet Delhi uses
+    # Ward_Name. Add new cities' keys here as their files arrive.
+    for k in ("KGISWardName", "Ward_Name", "ward_name", "WARD_NAME", "name", "Name", "ward"):
         if props.get(k):
             return str(props[k])
+    # Chennai (GCC): wards are NUMBERED, not named — Ward_No inside a named Zone.
+    # Compose from the REAL ward number; falling through to the positional index
+    # below would label Ward 119 as "Ward 042" by list order, i.e. wrong on every
+    # official document we'd address to it.
+    if props.get("Ward_No") is not None:
+        zone = props.get("Zone_Name")
+        return (f"Ward {props['Ward_No']} ({zone.title()})" if zone
+                else f"Ward {props['Ward_No']}")
     return f"Ward {idx + 1:03d}"
 
 
