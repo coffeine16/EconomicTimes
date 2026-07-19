@@ -40,10 +40,15 @@ def main() -> None:
         req = urllib.request.Request(
             f"{url}/rest/v1/{table}?select=*",
             headers={"apikey": key, "Authorization": f"Bearer {key}"})
-        try:
-            rows = json.loads(urllib.request.urlopen(req, timeout=30).read())
-        except Exception as e:  # noqa: BLE001 — a dead channel must not kill batch
-            print(f"[supabase] {table}: fetch failed ({type(e).__name__}: {e}) — skipped")
+        rows = None
+        for attempt in range(3):  # cold TLS handshakes to Supabase stall sometimes
+            try:
+                rows = json.loads(urllib.request.urlopen(req, timeout=30).read())
+                break
+            except Exception as e:  # noqa: BLE001 — a dead channel must not kill batch
+                err = f"{type(e).__name__}: {e}"
+        if rows is None:
+            print(f"[supabase] {table}: fetch failed after 3 tries ({err}) — skipped")
             continue
         (DATA_OUT / fname).write_text(json.dumps(rows, indent=1, default=str),
                                       encoding="utf-8")
