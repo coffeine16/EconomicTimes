@@ -6,6 +6,10 @@ data/outputs/*
 .env
 .venv/
 
+# MCP config carries the n8n API key literally (env-var indirection breaks:
+# the VS Code process tree holds a stale setx'd N8N_API_KEY it would expand).
+.mcp.json
+
 # Credentials. NEVER commit these.
 # The GCP service-account JSON is a live private key: leaking it lets anyone bill
 # our project. If one is ever pushed, REVOKE it in the console — deleting the
