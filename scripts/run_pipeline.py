@@ -47,6 +47,11 @@ def main():
     # drift between the pipeline and the serving layer (a drift bit us once).
     from intelligence.orchestrator import run_chain
 
+    # Pull channel-layer data (citizen reports, inspector statuses) down from
+    # Supabase before the agents run. Skips gracefully when keys are absent.
+    import subprocess
+    subprocess.run([sys.executable, "scripts/sync_supabase.py"], check=False)
+
     print(RULE)
     run_chain()
     print(RULE)

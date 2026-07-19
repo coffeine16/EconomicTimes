@@ -33,7 +33,8 @@ WARDS = dict(zip(ward_frame().cell, ward_frame().ward_id))
 # ------------------------------------------------------------ evidence
 def build_evidence(cell: str, ts: pd.Timestamp, panel_row: pd.Series,
                    osm: pd.DataFrame, sat_pct: dict, fire_activity: dict,
-                   wind_hist: list[float] | None = None) -> dict:
+                   wind_hist: list[float] | None = None,
+                   citizen: dict | None = None) -> dict:
     lat, lon = cell_center(cell)
     # Bearings live on a circle: the arithmetic mean of 350 and 10 is 180, which
     # points the evidence chain at exactly the wrong suspect. Chronic hotspots
@@ -71,11 +72,47 @@ def build_evidence(cell: str, ts: pd.Timestamp, panel_row: pd.Series,
         "candidates": candidates[:8],
         "pollutant_signature": sig,
         "fire_activity": fire_activity,
+        # Reports from the n8n channels (web form / Telegram), synced from Supabase
+        # by scripts/sync_supabase.py. Empty when the channel layer is not running —
+        # which must leave every score EXACTLY as it was.
+        "citizen_corroboration": citizen or {"n_reports": 0, "categories": {}},
         "landuse_context": {k: int(panel_row[f"lu_{k}"]) for k in CATEGORIES},
         "meteorology": {"wind_from_deg": round(wind_from), "wind_ms": round(float(panel_row.wind_ms), 1),
                         "blh_m": round(float(panel_row.blh_m)), "hour_local": hour,
                         "air_trapped": bool(panel_row.blh_m < 500)},
     }
+
+
+def citizen_corroboration_for(reports: list[dict], ward_id: str,
+                              ts: pd.Timestamp, window_h: int) -> dict:
+    """Reports matching this zone's WARD within its evidence window.
+
+    Matching is by ward — the administrative unit a citizen actually knows and the
+    unit n8n validates against — never by raw distance to an unverified phone GPS.
+
+    GUARD: the "unassigned" pseudo-ward (cells outside municipal limits) never
+    matches. All outside-limits cells share that one label, so without the guard a
+    single report anywhere outside city limits would "corroborate" every
+    outside-limits zone across the whole bbox — cross-contamination wearing the
+    face of evidence. No real ward, no ward-channel corroboration.
+    """
+    empty = {"n_reports": 0, "categories": {}, "window_hours": window_h}
+    if not reports or not ward_id or ward_id == "unassigned":
+        return empty
+    cats: dict[str, int] = {}
+    for r in reports:
+        if r.get("ward_id") != ward_id or r.get("category") in (None, "other"):
+            continue
+        try:
+            rts = pd.Timestamp(r.get("ts"))
+            if rts.tzinfo is None:
+                rts = rts.tz_localize("UTC")
+        except (ValueError, TypeError):
+            continue
+        if ts - pd.Timedelta(hours=window_h) <= rts <= ts:
+            cats[r["category"]] = cats.get(r["category"], 0) + 1
+    return {"n_reports": sum(cats.values()), "categories": cats,
+            "window_hours": window_h}
 
 
 # ------------------------------------------------- deterministic scores
@@ -131,6 +168,15 @@ def category_scores(ev: dict) -> dict:
     frac = ev["fire_activity"]["fire_hour_fraction"]
     if frac > 0:
         s["waste_burning"] += 1.0 + 2.0 * min(frac / 0.10, 1.0)
+    # CITIZEN CORROBORATION: a human photographing a source is a real, independent
+    # instrument — it is also the ONLY instrument that can see construction dust
+    # (0/3 blind spot: coarse PM, no satellite tracer, does not burn). But a single
+    # report is unverified, so the weight is modest and HARD-CAPPED: three reports
+    # saturate it. A brigade of reports must never out-shout the satellite or fire
+    # channels (0.25*3 = 0.75 max, below a single sustained-fire signal at 1.0-3.0).
+    for cat, n in ev.get("citizen_corroboration", {}).get("categories", {}).items():
+        if cat in s:
+            s[cat] += 0.25 * min(int(n), 3)
     for k in CATEGORIES:
         s[k] += 0.15 * min(ev["landuse_context"][k], 3)
     if 8 <= hour <= 18:
@@ -158,7 +204,13 @@ def independent_signals(ev: dict, top: str) -> int:
         n += 1
     if ev["landuse_context"].get(top, 0) > 0:
         n += 1
-    return n
+    if ev.get("citizen_corroboration", {}).get("categories", {}).get(top, 0) > 0:
+        n += 1
+    # cap at 4: agreement stays in [0,1] and the VALIDATED confidence calibration
+    # (hits 0.66 / misses 0.42, 100% precision above 0.70) is untouched whenever
+    # citizen data is absent — a fifth agreeing instrument saturates rather than
+    # inflating scores beyond what was calibrated.
+    return min(n, 4)
 
 
 def confidence_from(scores: dict, ev: dict, top: str) -> float:
@@ -223,6 +275,10 @@ def rule_based_reason(ev: dict, scores: dict, top: str) -> dict:
     if top == "waste_burning" and fa["fire_hours"]:
         factors.append(f'satellite fire detections in {fa["fire_hours"]} hours '
                        f'({fa["fire_hour_fraction"]:.0%} of the window)')
+    cit = ev.get("citizen_corroboration", {})
+    if cit.get("categories", {}).get(top):
+        factors.append(f'{cit["categories"][top]} citizen report(s) of '
+                       f'{top.replace("_", " ")} in this ward within the window')
     if ev["meteorology"]["air_trapped"]:
         factors.append(f'shallow boundary layer ({ev["meteorology"]["blh_m"]} m) trapping emissions')
     if not factors:
@@ -298,6 +354,16 @@ def run(top_n: int = 100) -> list[dict]:
     for h in hotspots:
         by_zone.setdefault(h.get("zone_id") or h["cell"], []).append(h)
 
+    # citizen reports (synced from Supabase). Absent file -> empty list -> every
+    # zone gets n_reports 0 and scoring is byte-identical to the no-channel world.
+    reports_p = DATA_OUT / "citizen_reports.json"
+    reports = []
+    if reports_p.exists():
+        try:
+            reports = json.loads(reports_p.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            reports = []
+
     out = []
     for zone_id, cells in by_zone.items():
         anchor = max(cells, key=lambda h: h["severity"])   # the zone's worst cell
@@ -326,8 +392,10 @@ def run(top_n: int = 100) -> list[dict]:
             "frp_p90": round(float(w.frp_6h.quantile(0.9)), 1),
         }
 
+        citizen = citizen_corroboration_for(reports, WARDS.get(anchor["cell"], ""),
+                                            ts, WINDOW_HOURS[kind])
         ev = build_evidence(anchor["cell"], ts, row, osm, sat_pct, fire_activity,
-                            wind_hist=w.wind_from_deg.tolist())
+                            wind_hist=w.wind_from_deg.tolist(), citizen=citizen)
         ev["hotspot_kind"] = kind
         ev["evidence_window_hours"] = WINDOW_HOURS[kind]
         ev["zone_cells"] = len(cell_ids)
