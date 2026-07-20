@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "Citizen View — AQ Intelligence Platform",
@@ -89,6 +90,7 @@ export default function CitizenLayout({ children }: { children: React.ReactNode 
           >
             Admin →
           </Link>
+          <ThemeToggle />
         </nav>
       </header>
 

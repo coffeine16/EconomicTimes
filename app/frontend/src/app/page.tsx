@@ -45,7 +45,9 @@ export default function LandingPage() {
 
         <h1
           style={{
-            background: "linear-gradient(135deg, #f0f4ff 30%, #60a5fa 70%, #a78bfa 100%)",
+            // Gradient starts at a mid blue (not near-white) so it reads on BOTH
+            // themes; near-white vanished on the light background.
+            background: "linear-gradient(135deg, var(--accent-blue) 20%, #60a5fa 60%, #a78bfa 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -176,7 +178,7 @@ export default function LandingPage() {
           ["3", "Real cities · live"],
           ["H3 · 8", "~460m grid"],
           ["6", "Data sources"],
-          ["8", "AI agents"],
+          ["9", "AI agents"],
           ["4", "Languages"],
         ].map(([val, label]) => (
           <div key={label} style={{ textAlign: "center" }}>

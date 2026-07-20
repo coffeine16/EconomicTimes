@@ -4,7 +4,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { api } from "@/lib/api";
-import { pm25ToAqi, getAqiCategory } from "@/lib/colors";
+import { pm25ToAqi, getAqiCategory, AQI_CATEGORIES } from "@/lib/colors";
 import { AQI_ADVICE } from "@/lib/constants";
 import type { FusionResponse, ForecastCell } from "@/lib/types";
 
@@ -45,7 +45,9 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
 
   const aqi = summary ? pm25ToAqi(summary.pm25) : null;
   const category = aqi != null ? getAqiCategory(aqi) : null;
-  const adviceIndex = aqi != null ? Math.min(Math.floor(aqi / 100), 5) : 0;
+  // Advice is keyed by CATEGORY, not aqi/100: the NAQI bands aren't every-100
+  // (Good is 0–50, Satisfactory 51–100), so floor(aqi/100) mislabelled them.
+  const adviceIndex = category ? Math.max(0, AQI_CATEGORIES.indexOf(category)) : 0;
 
   return (
     <div style={{ padding: "var(--space-xl)", maxWidth: 680, margin: "0 auto", width: "100%" }}>

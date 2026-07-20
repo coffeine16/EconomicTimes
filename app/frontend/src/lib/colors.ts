@@ -7,23 +7,36 @@
 
 export const AQI_BREAKPOINTS = [0, 50, 100, 200, 300, 400, 500] as const;
 
+// India NAQI PM2.5 breakpoints (CPCB). These MUST match the backend's authoritative
+// table (intelligence/agents/memo.py::NAQI_PM25) or the citizen map would show a
+// different AQI than the advisory computed for the same ward. Earlier this file
+// used US EPA breakpoints (12/35.4/55.4/…) with Indian labels — a real mismatch.
 export const AQI_CATEGORIES = [
-  { label: "Good", range: "0–50", color: "#00b050", textColor: "#fff", pm25Max: 12 },
-  { label: "Satisfactory", range: "51–100", color: "#92d050", textColor: "#222", pm25Max: 35.4 },
-  { label: "Moderate", range: "101–200", color: "#ffff00", textColor: "#222", pm25Max: 55.4 },
-  { label: "Poor", range: "201–300", color: "#ff9900", textColor: "#fff", pm25Max: 150.4 },
-  { label: "Very Poor", range: "301–400", color: "#ff0000", textColor: "#fff", pm25Max: 250.4 },
+  { label: "Good", range: "0–50", color: "#00b050", textColor: "#fff", pm25Max: 30 },
+  { label: "Satisfactory", range: "51–100", color: "#92d050", textColor: "#222", pm25Max: 60 },
+  { label: "Moderate", range: "101–200", color: "#ffff00", textColor: "#222", pm25Max: 90 },
+  { label: "Poor", range: "201–300", color: "#ff9900", textColor: "#fff", pm25Max: 120 },
+  { label: "Very Poor", range: "301–400", color: "#ff0000", textColor: "#fff", pm25Max: 250 },
   { label: "Severe", range: "401–500", color: "#99004c", textColor: "#fff", pm25Max: Infinity },
 ] as const;
 
-/** Convert PM2.5 µg/m³ to India NAQI AQI (simplified linear interpolation) */
+/** Convert PM2.5 µg/m³ to India NAQI AQI. Mirrors backend memo.py::pm25_to_aqi. */
 export function pm25ToAqi(pm25: number): number {
-  if (pm25 <= 12) return Math.round((50 / 12) * pm25);
-  if (pm25 <= 35.4) return Math.round(50 + ((100 - 50) / (35.4 - 12)) * (pm25 - 12));
-  if (pm25 <= 55.4) return Math.round(100 + ((200 - 100) / (55.4 - 35.4)) * (pm25 - 35.4));
-  if (pm25 <= 150.4) return Math.round(200 + ((300 - 200) / (150.4 - 55.4)) * (pm25 - 55.4));
-  if (pm25 <= 250.4) return Math.round(300 + ((400 - 300) / (250.4 - 150.4)) * (pm25 - 150.4));
-  return Math.round(400 + ((500 - 400) / (500 - 250.4)) * Math.min(pm25 - 250.4, 249.6));
+  // (conc_lo, conc_hi, aqi_lo, aqi_hi) — CPCB NAQI PM2.5 sub-index table
+  const bands: [number, number, number, number][] = [
+    [0, 30, 0, 50],
+    [30, 60, 51, 100],
+    [60, 90, 101, 200],
+    [90, 120, 201, 300],
+    [120, 250, 301, 400],
+    [250, 1000, 401, 500],
+  ];
+  for (const [cLo, cHi, iLo, iHi] of bands) {
+    if (pm25 <= cHi) {
+      return Math.round(iLo + ((iHi - iLo) * (pm25 - cLo)) / (cHi - cLo));
+    }
+  }
+  return 500;
 }
 
 export function getAqiCategory(aqi: number) {

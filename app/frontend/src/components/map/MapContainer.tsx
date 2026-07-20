@@ -67,6 +67,22 @@ export default function MapContainer({
   const [viewState, setViewState] = useState<{
     longitude: number; latitude: number; zoom: number; pitch: number; bearing: number;
   }>({ ...INITIAL_VIEW_STATE });
+
+  // Theme-aware base map: dark-matter on dark, positron (light) on light. Follows
+  // the same data-theme attribute the ThemeToggle stamps on <html>.
+  const [mapStyle, setMapStyle] = useState(MAP_STYLE);
+  useEffect(() => {
+    const apply = () =>
+      setMapStyle(
+        document.documentElement.getAttribute("data-theme") === "light"
+          ? "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
+          : MAP_STYLE
+      );
+    apply();
+    const obs = new MutationObserver(apply);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   // Auto-center on whatever city the loaded data actually belongs to. The pipeline's
@@ -223,7 +239,7 @@ export default function MapContainer({
   );
 
   return (
-    <div className="map-container" style={{ background: "#06090f" }}>
+    <div className="map-container" style={{ background: "var(--bg-base)" }}>
       <DeckGL
         viewState={viewState}
         onViewStateChange={({ viewState: vs }) => {
@@ -238,7 +254,7 @@ export default function MapContainer({
         }}
       >
         <Map
-          mapStyle={MAP_STYLE}
+          mapStyle={mapStyle}
           attributionControl={{ compact: true }}
         />
       </DeckGL>

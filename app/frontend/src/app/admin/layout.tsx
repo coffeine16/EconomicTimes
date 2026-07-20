@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "Admin Console — AQ Intelligence Platform",
@@ -109,6 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         >
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", display: "inline-block" }} />
           Delhi · H3 Res-8
+          <ThemeToggle />
           <Link
             href="/citizen"
             style={{
