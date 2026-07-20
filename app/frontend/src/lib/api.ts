@@ -76,6 +76,7 @@ import type {
   PipelineRunResult,
   AgentName,
   CityComparison,
+  Memo,
 } from "./types";
 
 export const api = {
@@ -122,9 +123,25 @@ export const api = {
     return res;
   },
 
-  // ─── Memo generation ─────────────────────────────────────────────────────────
-  generateMemo: (actionId: string) =>
-    apiFetch<{ memo_url: string }>(`/memo/${actionId}`, { method: "POST" }),
+  // ─── Memo ────────────────────────────────────────────────────────────────────
+  // GET, not POST: the memo is PRECOMPUTED by the batch pipeline (serving stays
+  // read-only). "Generate memo" fetches a document that already exists. Accepts an
+  // action_id OR a zone_id — the backend matches either. When the backend is down,
+  // fall back to the static memos.json and match client-side (demo insurance).
+  getMemo: async (id: string): Promise<Memo> => {
+    try {
+      return await apiFetch<Memo>(`/memo/${id}`);
+    } catch {
+      const res = await fetch("/data/memos.json");
+      if (!res.ok) throw new Error("memo unavailable");
+      const memos = (await res.json()) as Memo[];
+      const memo = memos.find(
+        (m) => m.action_id === id || m.zone_id === id || m.memo_id === id
+      );
+      if (!memo) throw new Error(`no memo for ${id}`);
+      return memo;
+    }
+  },
 
   // ─── Citizen ─────────────────────────────────────────────────────────────────
   getWardSummary: (wardId: string) =>

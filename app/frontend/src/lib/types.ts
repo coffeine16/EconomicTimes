@@ -292,6 +292,37 @@ export interface CreateReportPayload {
   lon?: number;
 }
 
+// ─── Enforcement memo ─────────────────────────────────────────────────────────
+// The memo agent's output: a dispatch-ready enforcement notice with a
+// rule-matched legal basis. GET /memo/{action_id or zone_id} returns one.
+export interface LegalBasis {
+  id: string;
+  statute: string;
+  provision: string;
+  summary: string;
+  authority: string;
+  action: string;
+  penalty: string;
+}
+
+export interface Memo {
+  memo_id: string;
+  action_id: string;
+  zone_id: string;
+  ward_id: string;
+  ward_name: string;
+  issued_at: string;
+  status: string;
+  subject: string;
+  background: string;
+  finding: string;
+  directive: string;
+  legal_basis: LegalBasis[];
+  evidence_chain: string[];
+  drafted_by: string;
+  disclaimer: string;
+}
+
 // ─── Multi-city comparison ────────────────────────────────────────────────────
 // One row per city, each a full LIVE pipeline run (scripts/city_summary.py).
 export interface CityComparison {

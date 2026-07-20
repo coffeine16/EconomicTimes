@@ -17,9 +17,10 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 import { api } from "@/lib/api";
-import type { Hotspot, Attribution } from "@/lib/types";
+import type { Hotspot, Attribution, Memo } from "@/lib/types";
 import { SOURCE_LABELS, PERSISTENCE_LABELS } from "@/lib/constants";
 import { SOURCE_COLORS } from "@/lib/colors";
+import MemoModal from "./MemoModal";
 
 interface Props {
   hotspots: Hotspot[];
@@ -214,6 +215,27 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
   );
   const sourceColor = attribution ? SOURCE_COLORS[attribution.primary_source] : "#888";
 
+  // Memo modal — the demo climax. Fetch the precomputed enforcement memo for this
+  // zone on click; render it in a modal.
+  const [memoOpen, setMemoOpen] = useState(false);
+  const [memo, setMemo] = useState<Memo | null>(null);
+  const [memoLoading, setMemoLoading] = useState(false);
+  const [memoError, setMemoError] = useState<string | null>(null);
+
+  const openMemo = async () => {
+    setMemoOpen(true);
+    setMemoLoading(true);
+    setMemoError(null);
+    setMemo(null);
+    try {
+      setMemo(await api.getMemo(zone.zone_id));
+    } catch {
+      setMemoError(`No memo for zone ${zone.zone_id}. Run the pipeline to draft one.`);
+    } finally {
+      setMemoLoading(false);
+    }
+  };
+
   return (
     <div
       className="card"
@@ -344,14 +366,32 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
 
           {/* Action buttons */}
           <div style={{ display: "flex", gap: "var(--space-sm)" }}>
-            <button className="btn btn-amber btn-sm" disabled style={{ flex: 1, justifyContent: "center" }}>
+            <button
+              className="btn btn-amber btn-sm"
+              onClick={(e) => { e.stopPropagation(); openMemo(); }}
+              style={{ flex: 1, justifyContent: "center" }}
+            >
               📋 Generate Memo
             </button>
-            <button className="btn btn-ghost btn-sm" disabled style={{ flex: 1, justifyContent: "center" }}>
-              🗺️ Dispatch Route
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={(e) => { e.stopPropagation(); onSelect(); }}
+              style={{ flex: 1, justifyContent: "center" }}
+              title="Select this zone on the map"
+            >
+              🗺️ Show on map
             </button>
           </div>
         </div>
+      )}
+
+      {memoOpen && (
+        <MemoModal
+          memo={memo}
+          loading={memoLoading}
+          error={memoError}
+          onClose={() => setMemoOpen(false)}
+        />
       )}
     </div>
   );
