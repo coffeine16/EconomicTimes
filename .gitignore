@@ -8,6 +8,7 @@ data/outputs/*
 data/outputs_snapshots/
 .env
 .venv/
+.vscode/
 
 # MCP config carries the n8n API key literally (env-var indirection breaks:
 # the VS Code process tree holds a stale setx'd N8N_API_KEY it would expand).
