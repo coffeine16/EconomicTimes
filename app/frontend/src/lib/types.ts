@@ -292,6 +292,32 @@ export interface CreateReportPayload {
   lon?: number;
 }
 
+// ─── Multi-city comparison ────────────────────────────────────────────────────
+// One row per city, each a full LIVE pipeline run (scripts/city_summary.py).
+export interface CityComparison {
+  city: string;
+  window_end: string;
+  mode: string;
+  detection: {
+    hotspot_cells: number;
+    zones: number;
+    enforceable_cells: number;
+  };
+  attribution: {
+    named: number;
+    by_source: Record<string, number>;
+    mean_confidence: number | null;
+  };
+  forecast_skill_vs_persistence_pct: {
+    h24: number | null;
+    h48: number | null;
+    h72: number | null;
+  };
+  fusion_loso_r2: number | null;
+  actions_queued: number;
+  advisory_wards: number;
+}
+
 // ─── Agent Pipeline ───────────────────────────────────────────────────────────
 
 export type AgentName =

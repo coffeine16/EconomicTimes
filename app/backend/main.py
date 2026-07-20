@@ -249,3 +249,12 @@ def actions():
 def dispatch():
     """Team routes for maximum-coverage dispatch."""
     return _json("dispatch.json")
+@app.get("/compare")
+def compare():
+    """Multi-city comparison rows. Each row is one FULL LIVE pipeline run over a
+    real city (real Sentinel-5P / FIRMS / OpenAQ / OSM), distilled by
+    scripts/city_summary.py. Returns [] until at least one city has been run."""
+    p = DATA_OUT / "city_comparison.json"
+    if not p.exists():
+        return []
+    return json.loads(p.read_text(encoding="utf-8"))

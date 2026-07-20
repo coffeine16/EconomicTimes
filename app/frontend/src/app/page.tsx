@@ -40,7 +40,7 @@ export default function LandingPage() {
           }}
         >
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent-blue)", display: "inline-block" }} />
-          Delhi · Live AQ Intelligence
+          Delhi · Chennai · Bengaluru — Live
         </div>
 
         <h1
@@ -173,11 +173,11 @@ export default function LandingPage() {
         }}
       >
         {[
-          ["~1,210", "H3 cells · Res 8"],
-          ["60", "Voronoi wards"],
+          ["3", "Real cities · live"],
+          ["H3 · 8", "~460m grid"],
           ["6", "Data sources"],
-          ["6", "AI agents"],
-          ["0.90", "Fusion LOSO R²"],
+          ["8", "AI agents"],
+          ["4", "Languages"],
         ].map(([val, label]) => (
           <div key={label} style={{ textAlign: "center" }}>
             <div

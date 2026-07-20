@@ -74,6 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <nav style={{ display: "flex", gap: 4 }}>
           {[
             { href: "/admin", label: "Map" },
+            { href: "/admin/compare", label: "Cities" },
             { href: "/admin/ledger", label: "Ledger" },
             { href: "/admin/registry", label: "Registry" },
             { href: "/admin/audit", label: "Audit" },

@@ -19,6 +19,7 @@ const FALLBACK_MAP: Record<string, string> = {
   "/stations":        "/data/stations.json",
   "/fires":           "/data/fires.json",
   "/loso":            "/data/loso.json",
+  "/compare":         "/data/city_comparison.json",
 };
 
 function getFallbackPath(endpoint: string): string | null {
@@ -74,6 +75,7 @@ import type {
   CreateReportPayload,
   PipelineRunResult,
   AgentName,
+  CityComparison,
 } from "./types";
 
 export const api = {
@@ -100,6 +102,10 @@ export const api = {
     apiFetch<DispatchRoute[]>("/dispatch").catch(() => [] as DispatchRoute[]),
   getLedger: () =>
     apiFetch<Ledger>("/ledger").catch(() => null),
+
+  // Multi-city comparison — each row is a full LIVE pipeline run over a real city.
+  getComparison: () =>
+    apiFetch<CityComparison[]>("/compare").catch(() => [] as CityComparison[]),
   getAudit: () =>
     apiFetch<AuditResponse>("/audit").catch(() => ({
       blind_spots: [],
