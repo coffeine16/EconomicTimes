@@ -23,7 +23,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     >
       {/* ── Top header ─────────────────────────────────────────────────────── */}
       <header
-        className="glass"
+        className="glass admin-header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -75,8 +75,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </span>
         </div>
 
-        {/* Nav tabs — scroll horizontally on narrow screens rather than overflow */}
-        <nav className="scroll-x" style={{ display: "flex", gap: 4, flexShrink: 1, minWidth: 0 }}>
+        {/* Nav tabs — on mobile these drop to their own full-width scrollable row */}
+        <nav className="scroll-x admin-nav" style={{ display: "flex", gap: 4, flexShrink: 1, minWidth: 0 }}>
           {[
             { href: "/admin", label: "Map" },
             { href: "/admin/compare", label: "Cities" },
@@ -104,6 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Right: city badge */}
         <div
+          className="admin-actions"
           style={{
             display: "flex",
             alignItems: "center",

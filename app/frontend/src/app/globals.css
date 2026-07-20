@@ -458,6 +458,23 @@ hr {
 
   /* Decorative chrome that isn't worth the width on a phone. */
   .hide-mobile { display: none !important; }
+
+  /* Admin header: too much for one 52px row on a phone. Wrap the nav to its own
+     full-width scrollable line below the logo + controls. */
+  .admin-header {
+    flex-wrap: wrap;
+    height: auto !important;
+    padding: 6px var(--space-md) !important;
+    row-gap: 4px;
+  }
+  .admin-header > *:first-child { order: 1; }   /* logo */
+  .admin-actions { order: 2; }                   /* city switcher + theme */
+  .admin-nav {
+    order: 3;
+    flex-basis: 100% !important;
+    width: 100%;
+    padding-bottom: 2px;
+  }
 }
 
 /* Never let a table or wide block push the page sideways. */
