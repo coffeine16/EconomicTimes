@@ -25,6 +25,12 @@ from shared.config import DATA_OUT, DATA_RAW
 app = FastAPI(title="AQ Intelligence Platform API", version="0.1")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# Voice advisories (MP3) are static files written by the batch pipeline.
+# Mount the directory so the frontend can play them directly.
+from fastapi.staticfiles import StaticFiles
+(DATA_OUT / "audio").mkdir(parents=True, exist_ok=True)
+app.mount("/audio", StaticFiles(directory=str(DATA_OUT / "audio")), name="audio")
+
 
 def _json(name: str):
     """Read a precomputed contract. UTF-8 EXPLICITLY.
@@ -137,6 +143,26 @@ def forecast(h: int | None = None):
 def forecast_eval():
     """RMSE at each horizon vs persistence + diurnal baselines. The rubric's number."""
     return _json("forecast_eval.json")
+
+
+@app.get("/voice/{ward_id}")
+def voice(ward_id: str, lang: str = "en"):
+    """Audio path for a ward's advisory in `lang`, plus how the TEXT was verified.
+
+    Serves what the pipeline precomputed (principle 3). The `text_verification`
+    field is carried through deliberately: audio FEELS more authoritative than
+    text, so a `cross_checked` (not native-reviewed) advisory must not launder
+    that fact by becoming a voice note. The frontend should surface it.
+    """
+    manifest_p = DATA_OUT / "audio" / "manifest.json"
+    if not manifest_p.exists():
+        raise HTTPException(404, "no voice audio generated yet — run the pipeline")
+    for e in json.loads(manifest_p.read_text(encoding="utf-8")):
+        if e["ward_id"] == ward_id and e["lang"] == lang:
+            return {"ward_id": ward_id, "lang": lang,
+                    "url": "/" + e["path"], "voice": e["voice"],
+                    "text_verification": e.get("text_verification")}
+    raise HTTPException(404, f"no {lang} audio for ward {ward_id}")
 
 
 @app.get("/advisories")

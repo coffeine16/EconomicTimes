@@ -1,10 +1,10 @@
-"""Agent orchestrator — the LangGraph StateGraph over the six-agent chain.
+"""Agent orchestrator — the LangGraph StateGraph over the agent chain.
 
 WHAT THIS IS AND IS NOT
   It orchestrates the AGENT chain only:
 
       detection -> attribution -> forecast -> prioritisation -> memo
-                -> advisory -> ledger
+                -> advisory -> voice -> ledger
 
   Ingestion, the panel build and fusion/LOSO are deliberately OUTSIDE the graph.
   They are heavy batch data-engineering (LOSO retrains 12 LightGBM models), not
@@ -69,11 +69,19 @@ def _advisory():
     from intelligence.agents.advisory import run
     run()
 
+def _voice():
+    # advisory TEXT -> MP3 via Cloud TTS. Best-effort: voice.py logs and skips on
+    # any TTS error so the run never fails for missing gcloud auth or a rate limit
+    # (principle 2) — the text advisories have already shipped by this point.
+    from intelligence.agents.voice import run
+    run()
+
 def _ledger():
     from intelligence.agents.ledger import run
     run()
 
-# Order is THE definition of the chain. voice joins here when its branch merges.
+# Order is THE definition of the chain. voice runs after advisory (it reads the
+# advisory text) and before ledger (which closes the run).
 AGENT_CHAIN: list[tuple[str, callable]] = [
     ("detection", _detection),
     ("attribution", _attribution),
@@ -81,6 +89,7 @@ AGENT_CHAIN: list[tuple[str, callable]] = [
     ("prioritisation", _prioritisation),
     ("memo", _memo),
     ("advisory", _advisory),
+    ("voice", _voice),
     ("ledger", _ledger),
 ]
 AGENT_NAMES = [n for n, _ in AGENT_CHAIN]

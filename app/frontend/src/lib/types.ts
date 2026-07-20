@@ -301,6 +301,7 @@ export type AgentName =
   | "prioritisation"
   | "memo"
   | "advisory"
+  | "voice"
   | "ledger";
 
 export type AgentStatus = "idle" | "running" | "done" | "error";

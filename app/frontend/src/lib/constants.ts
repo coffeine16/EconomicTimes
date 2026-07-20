@@ -55,6 +55,7 @@ export const AGENT_LABELS: Record<AgentName, string> = {
   prioritisation: "Prioritisation",
   memo:           "Enforcement Memo",
   advisory:       "Advisory",
+  voice:          "Voice",
   ledger:         "Ledger",
 };
 
@@ -67,6 +68,7 @@ export const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
   prioritisation: "Enforcement Priority Score + inspection route assignment",
   memo:           "Generates dispatch-ready enforcement memo with legal citation",
   advisory:       "Ward-level health advisories in Kannada / Hindi / Tamil / English",
+  voice:          "Synthesizes the highest-risk ward advisories to speech (Cloud TTS) for IVR / voice-note delivery",
   ledger:         "Freezes the counterfactual forecast per action; tracks signal→memo→dispatch response chain",
 };
 
@@ -77,6 +79,7 @@ export const AGENT_ORDER: AgentName[] = [
   "prioritisation",
   "memo",
   "advisory",
+  "voice",
   "ledger",
 ];
 

@@ -45,6 +45,7 @@ def main():
     # The agent chain is defined ONCE, in intelligence/orchestrator.py — the same
     # LangGraph graph the API's POST /run/agent executes, so chain order cannot
     # drift between the pipeline and the serving layer (a drift bit us once).
+    # Voice is now a node IN that chain (after advisory), not a bolt-on call here.
     from intelligence.orchestrator import run_chain
 
     # Pull channel-layer data (citizen reports, inspector statuses) down from
