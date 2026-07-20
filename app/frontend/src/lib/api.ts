@@ -5,6 +5,15 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+// Citizen reports do NOT go to the read-only FastAPI backend. They go to the n8n
+// channel layer (live, HTTPS), which validates, canonicalises the ward against the
+// official list, and writes to Supabase — the same table the pipeline syncs down
+// for attribution's citizen_corroboration. "Channels are dumb, agents are smart":
+// intake is the channel's job, not the serving API's.
+const N8N_WEBHOOK_URL =
+  process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL ||
+  "https://aq-intel.duckdns.org/webhook/citizen-report";
+
 /** Map from API path to the fallback static file in /public/data/ */
 const FALLBACK_MAP: Record<string, string> = {
   "/hotspots":        "/data/hotspots.json",
@@ -151,21 +160,42 @@ export const api = {
   getReports: () =>
     apiFetch<CitizenReport[]>("/reports").catch(() => [] as CitizenReport[]),
 
+  // Submit a citizen report to the n8n webhook (NOT the FastAPI backend). n8n
+  // validates, canonicalises the ward, and writes to Supabase. The webhook returns
+  // {ok, status}, so we synthesize a CitizenReport for the optimistic UI update —
+  // the authoritative row lives in Supabase and appears after the next sync.
   submitReport: async (payload: CreateReportPayload): Promise<CitizenReport> => {
-    // If photo, use multipart; else JSON
-    if (payload.photo) {
-      const form = new FormData();
-      form.append("ward_id", payload.ward_id);
-      form.append("category", payload.category);
-      if (payload.description) form.append("description", payload.description);
-      if (payload.lat != null) form.append("lat", String(payload.lat));
-      if (payload.lon != null) form.append("lon", String(payload.lon));
-      form.append("photo", payload.photo);
-      return apiFetch<CitizenReport>("/reports", { method: "POST", body: form, headers: {} });
-    }
-    return apiFetch<CitizenReport>("/reports", {
+    // Frontend uses "construction_dust"; the schema/pipeline category is "construction".
+    const category =
+      payload.category === "construction_dust" ? "construction" : payload.category;
+
+    const res = await fetch(N8N_WEBHOOK_URL, {
       method: "POST",
-      body: JSON.stringify(payload),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ward_id: payload.ward_id,
+        category,
+        description: payload.description ?? "",
+        lat: payload.lat ?? null,
+        lon: payload.lon ?? null,
+        source: "web",
+      }),
     });
+    if (!res.ok) throw new Error(`Report submission failed (HTTP ${res.status})`);
+    const ack = (await res.json().catch(() => ({}))) as { status?: string };
+
+    // Optimistic local record. report_id is provisional until the Supabase sync
+    // returns the authoritative row.
+    const now = new Date().toISOString();
+    return {
+      report_id: `local-${Date.now()}`,
+      ward_id: payload.ward_id,
+      ward_name: payload.ward_id,
+      category: payload.category,
+      description: payload.description ?? "",
+      status: (ack.status as CitizenReport["status"]) ?? "submitted",
+      created_at: now,
+      updated_at: now,
+    };
   },
 };
