@@ -4,7 +4,7 @@ WHAT THIS IS AND IS NOT
   It orchestrates the AGENT chain only:
 
       detection -> attribution -> forecast -> prioritisation -> memo
-                -> advisory -> voice -> ledger
+                -> advisory -> voice -> ledger -> audit
 
   Ingestion, the panel build and fusion/LOSO are deliberately OUTSIDE the graph.
   They are heavy batch data-engineering (LOSO retrains 12 LightGBM models), not
@@ -80,8 +80,15 @@ def _ledger():
     from intelligence.agents.ledger import run
     run()
 
+def _audit():
+    # Monitoring network audit (F4): blind spots -> next-sensor placement, sensor
+    # flags. Deterministic arithmetic on the fusion field + station locations; no
+    # LLM ever decides where a sensor goes. Reads precomputed artifacts only.
+    from intelligence.agents.audit import run
+    run()
+
 # Order is THE definition of the chain. voice runs after advisory (it reads the
-# advisory text) and before ledger (which closes the run).
+# advisory text); audit closes the run (it reads the fusion field + stations).
 AGENT_CHAIN: list[tuple[str, callable]] = [
     ("detection", _detection),
     ("attribution", _attribution),
@@ -91,6 +98,7 @@ AGENT_CHAIN: list[tuple[str, callable]] = [
     ("advisory", _advisory),
     ("voice", _voice),
     ("ledger", _ledger),
+    ("audit", _audit),
 ]
 AGENT_NAMES = [n for n, _ in AGENT_CHAIN]
 

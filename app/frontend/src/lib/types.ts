@@ -328,7 +328,8 @@ export type AgentName =
   | "memo"
   | "advisory"
   | "voice"
-  | "ledger";
+  | "ledger"
+  | "audit";
 
 export type AgentStatus = "idle" | "running" | "done" | "error";
 

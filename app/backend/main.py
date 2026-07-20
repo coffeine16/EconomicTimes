@@ -258,3 +258,11 @@ def compare():
     if not p.exists():
         return []
     return json.loads(p.read_text(encoding="utf-8"))
+@app.get("/audit")
+def audit():
+    """Monitoring network audit (F4): blind spots (dirty unmonitored cells ->
+    next-sensor placement) + sensor flags. Empty envelope until the pipeline runs."""
+    p = DATA_OUT / "audit.json"
+    if not p.exists():
+        return {"blind_spots": [], "sensor_flags": [], "placement_recommendations": []}
+    return json.loads(p.read_text(encoding="utf-8"))

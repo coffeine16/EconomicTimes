@@ -57,6 +57,7 @@ export const AGENT_LABELS: Record<AgentName, string> = {
   advisory:       "Advisory",
   voice:          "Voice",
   ledger:         "Ledger",
+  audit:          "Network Audit",
 };
 
 export const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
@@ -70,6 +71,7 @@ export const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
   advisory:       "Ward-level health advisories in Kannada / Hindi / Tamil / English",
   voice:          "Synthesizes the highest-risk ward advisories to speech (Cloud TTS) for IVR / voice-note delivery",
   ledger:         "Freezes the counterfactual forecast per action; tracks signal→memo→dispatch response chain",
+  audit:          "Audits the monitor network: dirty unmonitored cells → next-sensor placement + tamper flags",
 };
 
 export const AGENT_ORDER: AgentName[] = [
@@ -81,6 +83,7 @@ export const AGENT_ORDER: AgentName[] = [
   "advisory",
   "voice",
   "ledger",
+  "audit",
 ];
 
 // ─── Hotspot / Source ─────────────────────────────────────────────────────────
