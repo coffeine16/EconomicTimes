@@ -242,6 +242,15 @@ code, pre {
   background: rgba(245, 158, 11, 0.25);
   box-shadow: var(--shadow-glow-amber);
 }
+.btn-emerald {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--accent-emerald);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  font-weight: 600;
+}
+.btn-emerald:not(:disabled):hover {
+  background: rgba(16, 185, 129, 0.25);
+}
 
 .btn-sm {
   padding: 5px 12px;

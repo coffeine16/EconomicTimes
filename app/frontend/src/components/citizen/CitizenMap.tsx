@@ -1,0 +1,110 @@
+"use client";
+/**
+ * CitizenMap — a compact, tappable ward map for the citizen view.
+ *
+ * Colours every H3 cell by its fusion PM2.5 (what a person there is breathing),
+ * highlights the citizen's ward, and calls onPickWard when they tap a cell. Auto-
+ * fits to the data (any city). Deliberately lightweight — not the admin
+ * MapContainer, which needs the whole layer/filter machinery.
+ */
+import { useMemo, useState, useEffect, useRef } from "react";
+import Map from "react-map-gl/maplibre";
+import DeckGL from "@deck.gl/react";
+import { H3HexagonLayer } from "@deck.gl/geo-layers";
+import { cellToLatLng } from "h3-js";
+import "maplibre-gl/dist/maplibre-gl.css";
+
+import { pm25ToRgbaArray } from "@/lib/colors";
+
+interface FusionCell { cell: string; pm25: number; ward_id?: string }
+
+const DARK_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+const LIGHT_STYLE = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
+
+export default function CitizenMap({
+  cells,
+  highlightWard,
+  onPickWard,
+  height = 340,
+  interactive = true,
+}: {
+  cells: FusionCell[];
+  highlightWard?: string | null;
+  onPickWard?: (wardId: string, cell: string) => void;
+  height?: number | string;
+  interactive?: boolean;
+}) {
+  const [view, setView] = useState({ longitude: 77.15, latitude: 28.6, zoom: 10.5, pitch: 0, bearing: 0 });
+  const didFit = useRef(false);
+
+  // theme-aware base map — reads the same data-theme the app toggles
+  const [mapStyle, setMapStyle] = useState(DARK_STYLE);
+  useEffect(() => {
+    const apply = () =>
+      setMapStyle(document.documentElement.getAttribute("data-theme") === "light" ? LIGHT_STYLE : DARK_STYLE);
+    apply();
+    const obs = new MutationObserver(apply);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => obs.disconnect();
+  }, []);
+
+  // fit to the highlighted ward if given, else to all cells
+  useEffect(() => {
+    if (didFit.current || !cells.length) return;
+    const target = highlightWard ? cells.filter((c) => c.ward_id === highlightWard) : cells;
+    const use = target.length ? target : cells;
+    let sLat = 0, sLon = 0, n = 0;
+    for (const c of use) {
+      try { const [lat, lon] = cellToLatLng(c.cell); sLat += lat; sLon += lon; n++; } catch {}
+    }
+    if (!n) return;
+    didFit.current = true;
+    setView((v) => ({ ...v, latitude: sLat / n, longitude: sLon / n, zoom: highlightWard ? 12.5 : 10.5 }));
+  }, [cells, highlightWard]);
+
+  const layer = useMemo(() => {
+    if (!cells.length) return null;
+    return new H3HexagonLayer<FusionCell>({
+      id: "citizen-fusion",
+      data: cells,
+      getHexagon: (d) => d.cell,
+      getFillColor: (d) => {
+        const base = pm25ToRgbaArray(d.pm25, highlightWard ? 90 : 150);
+        if (highlightWard && d.ward_id === highlightWard) return pm25ToRgbaArray(d.pm25, 235);
+        return base;
+      },
+      getLineColor: (d) =>
+        highlightWard && d.ward_id === highlightWard ? [255, 255, 255, 200] : [255, 255, 255, 14],
+      lineWidthMinPixels: highlightWard ? 1 : 0.5,
+      stroked: true,
+      extruded: false,
+      pickable: interactive,
+      autoHighlight: interactive,
+      highlightColor: [255, 255, 255, 50],
+      updateTriggers: { getFillColor: highlightWard, getLineColor: highlightWard },
+      onClick: (info) => {
+        if (interactive && info.object && onPickWard) {
+          const d = info.object as FusionCell;
+          if (d.ward_id) onPickWard(d.ward_id, d.cell);
+        }
+      },
+    });
+  }, [cells, highlightWard, onPickWard, interactive]);
+
+  return (
+    <div style={{ position: "relative", width: "100%", height, borderRadius: "var(--radius-lg)", overflow: "hidden", border: "1px solid var(--border-subtle)" }}>
+      <DeckGL
+        viewState={view}
+        onViewStateChange={interactive ? ({ viewState: vs }) => {
+          const v = vs as typeof view;
+          setView({ longitude: v.longitude, latitude: v.latitude, zoom: v.zoom, pitch: v.pitch, bearing: v.bearing });
+        } : undefined}
+        controller={interactive}
+        layers={layer ? [layer] : []}
+        getCursor={() => (interactive ? "pointer" : "grab")}
+      >
+        <Map reuseMaps mapStyle={mapStyle} attributionControl={false} />
+      </DeckGL>
+    </div>
+  );
+}

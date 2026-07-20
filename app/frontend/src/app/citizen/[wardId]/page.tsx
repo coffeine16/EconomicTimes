@@ -1,10 +1,17 @@
 "use client";
-import { use } from "react";
+import { use, useMemo } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import useSWR from "swr";
 import { api } from "@/lib/api";
 import { pm25ToAqi, getAqiCategory } from "@/lib/colors";
 import { AQI_ADVICE } from "@/lib/constants";
+import type { FusionResponse, ForecastCell } from "@/lib/types";
+
+const CitizenMap = dynamic(() => import("@/components/citizen/CitizenMap"), {
+  ssr: false,
+  loading: () => <div className="skeleton" style={{ height: 300, borderRadius: "var(--radius-lg)" }} />,
+});
 
 interface Params { wardId: string }
 
@@ -15,6 +22,26 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
     ["ward-summary", wardId],
     () => api.getWardSummary(wardId)
   );
+  const { data: fusion } = useSWR<FusionResponse>(["fusion", 0], () => api.getFusion(0));
+  const cells = useMemo(() => fusion?.cells ?? [], [fusion]);
+
+  // forecast for this ward: median predicted AQI across its cells, per horizon
+  const { data: fc24 } = useSWR<ForecastCell[]>(["forecast", 24], () => api.getForecast(24));
+  const { data: fc48 } = useSWR<ForecastCell[]>(["forecast", 48], () => api.getForecast(48));
+  const { data: fc72 } = useSWR<ForecastCell[]>(["forecast", 72], () => api.getForecast(72));
+  const wardCells = useMemo(() => new Set(cells.filter((c) => c.ward_id === wardId).map((c) => c.cell)), [cells, wardId]);
+  const horizonAqi = (fc?: ForecastCell[]): number | null => {
+    if (!fc) return null;
+    const vals = fc.filter((f) => wardCells.has(f.cell)).map((f) => f.pm25_hat).sort((a, b) => a - b);
+    if (!vals.length) return null;
+    return pm25ToAqi(vals[Math.floor(vals.length / 2)]);
+  };
+  const forecast = [
+    { label: "Now", aqi: summary ? pm25ToAqi(summary.pm25) : null },
+    { label: "+24h", aqi: horizonAqi(fc24) },
+    { label: "+48h", aqi: horizonAqi(fc48) },
+    { label: "+72h", aqi: horizonAqi(fc72) },
+  ];
 
   const aqi = summary ? pm25ToAqi(summary.pm25) : null;
   const category = aqi != null ? getAqiCategory(aqi) : null;
@@ -32,11 +59,11 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
           transition: "color var(--transition-fast)",
         }}
       >
-        ← All wards
+        ← Change ward
       </Link>
 
       {/* Ward name */}
-      <div style={{ marginBottom: "var(--space-xl)" }}>
+      <div style={{ marginBottom: "var(--space-md)" }}>
         <h1 style={{ marginBottom: 4 }}>
           {isLoading ? (
             <span className="skeleton" style={{ display: "inline-block", width: 200, height: 32, borderRadius: 6 }} />
@@ -47,6 +74,14 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
         <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--text-tertiary)" }}>
           {wardId}
         </span>
+      </div>
+
+      {/* Map of THIS ward — leads the page: you land on your area */}
+      <div style={{ marginBottom: "var(--space-lg)" }}>
+        <CitizenMap cells={cells} highlightWard={wardId} interactive={false} height={280} />
+        <p style={{ fontSize: "0.72rem", color: "var(--text-tertiary)", textAlign: "center", marginTop: 6 }}>
+          Live PM2.5 across your ward — brighter cells are dirtier air.
+        </p>
       </div>
 
       {/* AQI Card */}
@@ -116,17 +151,30 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
         </div>
       )}
 
-      {/* Forecast placeholder */}
+      {/* 72-hour forecast — median predicted AQI across the ward's cells */}
       <div className="card" style={{ marginBottom: "var(--space-lg)" }}>
         <h5 style={{ marginBottom: "var(--space-md)" }}>72-Hour Forecast</h5>
-        <div
-          style={{
-            height: 160, display: "flex", alignItems: "center", justifyContent: "center",
-            border: "1px dashed var(--border-default)", borderRadius: "var(--radius-sm)",
-            color: "var(--text-tertiary)", fontSize: "0.875rem",
-          }}
-        >
-          ForecastChart component (recharts) — loaded in next phase
+        <div style={{ display: "flex", gap: "var(--space-sm)" }}>
+          {forecast.map((f) => {
+            const cat = f.aqi != null ? getAqiCategory(f.aqi) : null;
+            return (
+              <div
+                key={f.label}
+                style={{
+                  flex: 1, textAlign: "center", padding: "var(--space-md) 4px",
+                  borderRadius: "var(--radius-md)",
+                  background: cat ? cat.color + "12" : "var(--bg-secondary)",
+                  border: `1px solid ${cat ? cat.color + "30" : "var(--border-subtle)"}`,
+                }}
+              >
+                <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginBottom: 6 }}>{f.label}</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: cat?.color ?? "var(--text-tertiary)", lineHeight: 1 }}>
+                  {f.aqi ?? "—"}
+                </div>
+                <div style={{ fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: 4 }}>{cat?.label ?? ""}</div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
