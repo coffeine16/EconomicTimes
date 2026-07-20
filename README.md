@@ -313,7 +313,8 @@ Because a README that oversells is the same bug as a metric that oversells.
 | Read-only serving API (20+ endpoints) | ✅ real |
 | **Fusion exposure field** | ❌ **claim withdrawn.** On real Delhi it is **14% worse than a naive city-mean** (RMSE 75.4 vs 66.0). We tried predicting the *deviation* from the city median — a construction that cannot lose to the baseline — and it still lost, which means the spatial model has **no transferable skill** across held-out stations. We do not claim it. |
 | **Frontend — React + Leaflet console** | 🔨 **in progress.** API + JSON contracts are real; the map/queue UI is the active build. Screenshots below once it lands. |
-| Voice advisories (TTS) · GEE Sentinel-5P collector | ⬜ **not built** — live mode mixes real stations with a synthetic satellite, which is scientifically invalid until the GEE collector lands |
+| GEE Sentinel-5P collector | ✅ **built and wired** — real `COPERNICUS/S5P` extraction; it produced the real Delhi result. Live satellite needs GEE auth on the run machine (`gcloud auth application-default login`); until then synthetic mode runs fully offline |
+| Voice advisory **audio** (TTS) | 🔨 text + voice mapping on `main`; audio synthesis on `feature/voice-advisories`, pending a native-speaker listen before merge |
 
 > ### ⚠️ Live mode refuses to fake anything
 > If the satellite, fire, or OSM collector fails, the pipeline **raises rather than
@@ -418,18 +419,23 @@ python scripts/eval_hotspot_recovery.py     # fusion as an EXPOSURE map — and 
 
 ## Roadmap
 
-**Done since the first draft** ✅ 7-agent LangGraph pipeline (detect → attribute →
-forecast → prioritise → memo → advise → ledger) · real Datameet ward boundaries for
-three cities · n8n citizen intake + inspector loop, live and proven into the
-evidence chain · multi-language advisories with honest per-language verification.
+**Done since the first draft** ✅ Sentinel-5P collector via Google Earth Engine
+(built and wired — it produced the real Delhi result) · 7-agent LangGraph pipeline
+(detect → attribute → forecast → prioritise → memo → advise → ledger) · real
+Datameet ward boundaries for three cities · n8n citizen intake + inspector loop,
+live and proven into the evidence chain · multi-language advisory *text* with honest
+per-language verification labels.
 
-**Still ahead:**
+**Landing now — built on feature branches, merging to `main`:**
 
-- [ ] **Sentinel-5P collector via Google Earth Engine** — the critical path; live mode is invalid without it
+- [ ] **Frontend** (`feature/frontend-app`) — React + Leaflet console + citizen view; typed API client with static-JSON fallback; memo/report buttons already call `POST /memo/{id}` and `POST /reports`. Merge + smoke-test against the live API.
+- [ ] **Voice advisories** (`feature/voice-advisories`) — the advisory *text* + Google-TTS voice mapping ship on `main`; the **audio synthesis** and `/voice` endpoint are on the branch, pending a native-speaker listen before merge.
+
+**Genuinely still ahead:**
+
+- [ ] **Live satellite needs GEE auth on the run machine** — the collector is done; `gcloud auth application-default login` (see `docs/gcp-setup.md`) is the one manual step. Until then, synthetic mode runs fully offline.
 - [ ] Sentinel-2 optical change detection → close the construction blind spot (S5P never will)
-- [ ] React + Leaflet admin console and citizen view — **in progress**
-- [ ] Voice advisories (TTS) in Kannada/Tamil — plumbing exists, audio pending
-- [ ] Harden the frontend memo/report buttons against the live API endpoints
+- [ ] Kannada advisory text is `cross_checked`, not native-verified — ten minutes with a Kannada speaker upgrades it
 
 ---
 
