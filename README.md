@@ -9,7 +9,8 @@
   <img alt="python" src="https://img.shields.io/badge/python-3.11-0f6b3f?style=flat-square" />
   <img alt="models" src="https://img.shields.io/badge/models-LightGBM%20%2B%20robust%20stats-0f6b3f?style=flat-square" />
   <img alt="spatial" src="https://img.shields.io/badge/spatial-H3%20res--8-0f6b3f?style=flat-square" />
-  <img alt="serving" src="https://img.shields.io/badge/serving-FastAPI-0f6b3f?style=flat-square" />
+  <img alt="agents" src="https://img.shields.io/badge/agents-7--node%20LangGraph-0f6b3f?style=flat-square" />
+  <img alt="serving" src="https://img.shields.io/badge/serving-FastAPI%20%2B%20n8n%20channels-0f6b3f?style=flat-square" />
   <img alt="data" src="https://img.shields.io/badge/data-Sentinel--5P%20%2F%20FIRMS%20%2F%20OpenAQ-a9760a?style=flat-square" />
   <img alt="llm" src="https://img.shields.io/badge/LLM-explains%2C%20never%20ranks-a9760a?style=flat-square" />
 </p>
@@ -46,14 +47,18 @@ python scripts/eval_detection.py                         # THE headline stat
 
 Then serve it:
 
+The `--full` run drives the whole **7-agent pipeline** and writes every JSON
+contract (`hotspots`, `attributions`, `forecast`, `actions`, `dispatch`, `memos`,
+`advisories`, `ledger`) to `data/outputs/`. Then serve it:
+
 ```bash
-uvicorn app.backend.main:app --reload --port 8000        # GET /hotspots, /attribution/{cell}, /wards, /fusion, /loso
+uvicorn app.backend.main:app --reload --port 8000        # 20+ endpoints: /hotspots, /attribution/{cell}, /actions, /dispatch, /ledger, /advisories …
 ```
 
-> **There is no deployed demo and no frontend yet.** The API is real and
-> read-only; the React/Leaflet console is the next build. See
-> [what's real vs prototype](#whats-real-vs-prototype) — we'd rather tell you
-> than let you find out.
+> **The API is real and read-only; the React/Leaflet console is the active build.**
+> The channel layer (n8n citizen bot + inspector loop) is **live and deployed**. See
+> [what's real vs prototype](#whats-real-vs-prototype) — we'd rather tell you than
+> let you find out.
 
 ---
 
@@ -109,27 +114,38 @@ of error as [the 100% trap](#the-100-trap), one level deeper.
 
 ---
 
-## How it works
+## How it works — the whole system at a glance
+
+Three tiers: a **batch data platform** turns raw feeds into a feature table; a
+**7-agent pipeline** turns that table into named sources, priorities, memos and
+advisories; a **read-only serving layer** exposes precomputed JSON that the
+frontend and channels consume. Heavy compute never touches a request handler.
 
 ```mermaid
 flowchart LR
-    subgraph SRC["Ingestion — 6 free sources, live + synthetic fallback"]
-        OAQ["OpenAQ<br/>CPCB stations"]
-        S5P["Sentinel-5P<br/>NO₂ / SO₂ / aerosol"]
-        FIR["NASA FIRMS<br/>thermal fires"]
-        MET["Open-Meteo<br/>wind + boundary layer"]
-        OSM["OpenStreetMap<br/>industry, kilns, roads"]
+    subgraph SRC["① Ingestion — 6 free sources, live + synthetic fallback"]
+        direction TB
+        OAQ["OpenAQ · CPCB stations"]
+        S5P["Sentinel-5P · NO₂/SO₂/aerosol"]
+        FIR["NASA FIRMS · thermal fires"]
+        MET["Open-Meteo · wind + BLH"]
+        OSM["OpenStreetMap · industry, roads"]
+        CIT["Citizens · Telegram + web<br/>(n8n → Supabase)"]
     end
 
-    SRC --> PANEL["Panel<br/>H3 cell × hour feature table"]
+    SRC --> PANEL["② Panel<br/>H3 cell × hour feature table"]
+    PANEL --> FUSION["Fusion field · LightGBM"]
+    PANEL --> AGENTS
 
-    PANEL --> FUSION["Fusion field<br/>LightGBM"]
-    PANEL --> DETECT["Detection<br/>satellite contrast + fire persistence"]
+    subgraph AGENTS["③ Agent pipeline (LangGraph · 7 nodes)"]
+        direction LR
+        DET["detect"] --> ATT["attribute"] --> FC["forecast"] --> PR["prioritise"] --> MO["memo"] --> AD["advise"] --> LG["ledger"]
+    end
 
-    FUSION -->|"EXPOSURE<br/>what people breathe"| API
-    DETECT -->|"SOURCES<br/>who to inspect"| ATTR["Attribution<br/>deterministic scores + evidence chain"]
-    ATTR --> API["Read-only FastAPI<br/>precomputed JSON contracts"]
-    API --> FE["Frontend<br/>(not built yet)"]
+    FUSION -->|"EXPOSURE · what people breathe"| API
+    AGENTS -->|"SOURCES · who to inspect, what to do"| API
+    API["④ Read-only FastAPI<br/>precomputed JSON contracts"] --> FE["Frontend · React + Leaflet<br/>(building)"]
+    API --> CH["Channels · n8n<br/>advisories, inspector loop"]
 
     style FE stroke-dasharray: 5 5
 ```
@@ -139,7 +155,43 @@ and every ranking are plain reproducible arithmetic. An LLM may only write prose
 explaining a score that was already computed — and if it disagrees with the
 arithmetic, **the arithmetic wins and the LLM output is discarded.** Every
 LLM path has a rule-based fallback with an identical output schema, so a missing
-API key degrades the *prose*, never the *answer*.
+API key degrades the *prose*, never the *answer*. **This discipline holds even at
+the edge** — the citizen-intake bot lets an LLM *extract* fields from a free-text
+report, but deterministic code canonicalises the ward against the official list
+and clamps the category before anything is stored (see the [citizen loop](#the-citizen-loop--from-a-phone-to-the-evidence-chain)).
+
+---
+
+## The agent pipeline — signal to action
+
+One `LangGraph` state machine runs seven agents over a shared typed state. Each
+node is wrapped so one failure degrades the output instead of killing the run; the
+same graph backs both the batch pipeline and the API's `POST /run/agent`, so chain
+order can never drift between them.
+
+```mermaid
+flowchart TD
+    D["🛰️ detect<br/><small>NO₂ contrast + fire persistence → zones</small>"]
+    A["🔍 attribute<br/><small>deterministic category scores + evidence chain + confidence</small>"]
+    F["📈 forecast<br/><small>24–72 h PM2.5 vs persistence baseline</small>"]
+    P["🎯 prioritise<br/><small>Enforcement Priority Score + dispatch routing</small>"]
+    M["📄 memo<br/><small>dispatch-ready notice + rule-matched legal basis</small>"]
+    V["📢 advise<br/><small>ward health advisories · Kannada/Hindi/Tamil/English</small>"]
+    L["📒 ledger<br/><small>freeze counterfactual forecast · track signal→memo→dispatch time</small>"]
+    D --> A --> F --> P --> M --> V --> L
+
+    A -. "citizen reports<br/>corroborate" .-> CIT["👥 citizen evidence<br/><small>from the channel layer</small>"]
+    CIT -. "+1 independent instrument<br/>(capped)" .-> A
+
+    classDef det fill:#0f6b3f22,stroke:#0f6b3f;
+    classDef llm fill:#a9760a22,stroke:#a9760a;
+    class D,P det
+    class A,F,M,V llm
+```
+
+Green nodes are pure arithmetic; amber nodes call an LLM **for prose only**, each
+with a rule-based fallback. Every agent writes a versioned JSON contract to
+`data/outputs/` that the API serves read-only.
 
 ---
 
@@ -199,6 +251,49 @@ Three rules hold this together:
 
 ---
 
+## The citizen loop — from a phone to the evidence chain
+
+Citizens are a third observation tier — *"900 stations + 2 satellites + a million
+human sensors"* — and, uniquely, the only instrument that can see the construction
+dust the satellite is blind to. The intake is a live Telegram bot (and a web form
+against the same endpoint), deployed on n8n behind automatic HTTPS.
+
+```mermaid
+flowchart LR
+    U["📱 Citizen<br/><small>“Bhalswa mein kachra<br/>jal raha hai”</small>"] --> TG["Telegram / web form"]
+    TG --> N8N
+
+    subgraph N8N["n8n workflow — channels stay DUMB"]
+        direction TB
+        RT["Preprocess · route<br/><small>command? inspector? report?</small>"] --> GEM["Gemini · extract<br/><small>{category, ward_guess}</small>"]
+        GEM --> FIN["Finalize · DECIDE<br/><small>canonicalise ward vs 733 official names;<br/>clamp category; keyword fallback</small>"]
+    end
+
+    FIN --> SUP["🗄️ Supabase<br/><small>citizen_reports (RLS: anon insert-only)</small>"]
+    SUP --> SYNC["sync_supabase.py<br/><small>→ data/outputs/</small>"]
+    SYNC --> ATT["🔍 attribute<br/><small>matches by ward + evidence window</small>"]
+    ATT --> EV["Evidence chain<br/><small>“1 citizen report of waste_burning”<br/>confidence 0.77 → 0.84</small>"]
+
+    classDef llm fill:#a9760a22,stroke:#a9760a;
+    classDef det fill:#0f6b3f22,stroke:#0f6b3f;
+    class GEM llm
+    class FIN,SYNC,ATT det
+```
+
+**Proven end-to-end**, not just wired. A live report against a detected
+`waste_burning` zone lifts its confidence **0.77 → 0.84** and adds
+*"Citizen reports of waste burning"* to its evidence factors — because it counts as
+**one more independent agreeing instrument** (fire + citizen = 2), computed by
+deterministic math. The lift is **capped**: a brigade of reports can never
+manufacture a source or out-shout the satellite. Reports outside the evidence
+window, or that match no real ward, correctly do **not** corroborate.
+
+The same bot carries the **inspector loop** — an inspector replies `done <id>`, the
+status is written back, and the ledger stamps the response time. Two audiences, one
+channel; the channel moves bytes and nothing more.
+
+---
+
 ## What's real vs prototype
 
 Because a README that oversells is the same bug as a metric that oversells.
@@ -206,12 +301,19 @@ Because a README that oversells is the same bug as a metric that oversells.
 | | Status |
 |---|---|
 | Ingestion — Sentinel-5P, OpenAQ, Open-Meteo, FIRMS, OSM | ✅ **all real and live.** Run end-to-end on Delhi, Nov 2025 |
-| H3 spatial fabric + ward layer | ✅ real (official GeoJSON if present, deterministic Voronoi fallback) |
+| H3 spatial fabric + real ward boundaries | ✅ real (official Datameet GeoJSON for Bengaluru/Delhi/Chennai; Voronoi fallback) |
 | Detection (NO₂ contrast + fire persistence) | ✅ real — validated on a real landfill fire |
 | Attribution + evidence chain + confidence | ✅ real, truth-scored, calibrated |
+| Forecast — 24/48/72 h vs persistence baseline | ✅ real. Gradient boosting; **27–28% RMSE skill vs persistence** on synthetic. On real Delhi the *direction* is the finding: persistence wins ≤24 h, the model wins 72 h (the enforcement-scheduling window) |
+| Prioritisation (EPS) + dispatch routing | ✅ real — deterministic score, greedy set-cover, per-team routes |
+| Enforcement memo + rule-matched legal basis | ✅ real — deterministic legal citation, LLM drafts prose only |
+| Ward advisory agent — Kannada/Hindi/Tamil/English | ✅ real, with **per-language verification labels** (native-speaker vs cross-checked — never claims a review it didn't get) |
+| Intervention ledger — response time + counterfactual | ✅ real. Response-time is honest (CAG's *weeks* vs one automated batch); effectiveness freezes the +48 h counterfactual, `our_impact: null` until a real intervention exists |
+| Channels — n8n citizen intake + inspector loop | ✅ **live.** Telegram bot + web webhook → Supabase, proven end-to-end into the evidence chain |
+| Read-only serving API (20+ endpoints) | ✅ real |
 | **Fusion exposure field** | ❌ **claim withdrawn.** On real Delhi it is **14% worse than a naive city-mean** (RMSE 75.4 vs 66.0). We tried predicting the *deviation* from the city median — a construction that cannot lose to the baseline — and it still lost, which means the spatial model has **no transferable skill** across held-out stations. We do not claim it. |
-| Read-only serving API | ✅ real |
-| Forecast, EPS/dispatch, memo, advisory, frontend, n8n | ⬜ **not built** |
+| **Frontend — React + Leaflet console** | 🔨 **in progress.** API + JSON contracts are real; the map/queue UI is the active build. Screenshots below once it lands. |
+| Voice advisories (TTS) · GEE Sentinel-5P collector | ⬜ **not built** — live mode mixes real stations with a synthetic satellite, which is scientifically invalid until the GEE collector lands |
 
 > ### ⚠️ Live mode refuses to fake anything
 > If the satellite, fire, or OSM collector fails, the pipeline **raises rather than
@@ -225,6 +327,29 @@ Because a README that oversells is the same bug as a metric that oversells.
 > Bengaluru in 60 days** (our synthetic world had 281). Both channels go blind.
 > Delhi's burning season is **October–November**, which is where the real result
 > above comes from.
+
+---
+
+## See it running
+
+> 🖼️ **Screenshots land here once the frontend ships.** Placeholders name the shot
+> so the story reads even before the images are attached.
+
+| | |
+|---|---|
+| **Admin console — the map** | _`docs/img/console-map.png`_ · fusion choropleth + hotspot zones + fires, with the layer toggles and the +72 h forecast time-slider |
+| **Action Queue → evidence chain** | _`docs/img/evidence-chain.png`_ · an EPS-ranked card expanded to *"why this hotspot"* — the inspectable evidence, including citizen corroboration |
+| **One-click enforcement memo** | _`docs/img/memo.png`_ · the dispatch-ready notice with its rule-matched legal citation |
+| **Citizen bot, live** | _`docs/img/telegram-loop.png`_ · a Hinglish report in, `ward: BHALSWA · waste_burning` out — the shot below is real today |
+| **Live agent progress (SSE)** | _`docs/img/agent-strip.png`_ · the seven agents streaming *running → completed* during a pipeline run |
+
+The Telegram loop is already demonstrable end-to-end:
+
+```
+Citizen:  Bhalswa mein kachra jal raha hai
+AQIntel:  Report received - ward: BHALSWA, category: waste_burning.
+          If it corroborates an inspection you will hear back here.
+```
 
 ---
 
@@ -263,16 +388,20 @@ assumption we made.
 ## Repo layout
 
 ```
-app/            presentation: read-only FastAPI (frontend not built yet)
+app/            backend/main.py — read-only FastAPI (20+ contracts)
+                frontend/       — React + Vite + Leaflet console (in progress)
 ingestion/      collectors (6 sources, live + synthetic fallback)
                 preprocessing/panel.py — the cell × hour feature table
                 synthetic.py — the adversarial hidden-source world
-intelligence/   models/fusion.py    — LightGBM exposure field
+intelligence/   orchestrator.py     — the 7-agent LangGraph state machine
+                models/fusion.py    — LightGBM exposure field
                 models/signals.py   — robust multi-window statistics
-                agents/detect.py    — satellite contrast + fire persistence
-                agents/attribution.py, llm_gateway.py
-shared/         config, H3 grid utilities, ward layer
-scripts/        pipeline runner + four truth-scored evaluations
+                agents/             — detect, attribution, forecast, prioritise,
+                                      memo, advisory, ledger + llm_gateway
+shared/         config, H3 grid utilities, real ward layer (3 cities)
+scripts/        run_pipeline.py, sync_supabase.py + truth-scored evaluations
+db/             schema.sql — Supabase contracts the channel layer writes to
+deploy/         n8n on GCP: Terraform + Caddy + DuckDNS runbook
 docs/           architecture.md — the 9-layer design and why it's shaped this way
 ```
 
@@ -289,14 +418,18 @@ python scripts/eval_hotspot_recovery.py     # fusion as an EXPOSURE map — and 
 
 ## Roadmap
 
+**Done since the first draft** ✅ 7-agent LangGraph pipeline (detect → attribute →
+forecast → prioritise → memo → advise → ledger) · real Datameet ward boundaries for
+three cities · n8n citizen intake + inspector loop, live and proven into the
+evidence chain · multi-language advisories with honest per-language verification.
+
+**Still ahead:**
+
 - [ ] **Sentinel-5P collector via Google Earth Engine** — the critical path; live mode is invalid without it
 - [ ] Sentinel-2 optical change detection → close the construction blind spot (S5P never will)
-- [ ] Forecast agent (wind-weighted STGCN + persistence baseline)
-- [ ] Enforcement Priority Score + dispatch routing
-- [ ] Enforcement memo agent with a rule-matched legal basis
-- [ ] React + Leaflet admin console and citizen view
-- [ ] n8n channels: citizen intake, voice advisories, inspector loop
-- [ ] Real ward boundaries (BBMP GeoJSON) — the Voronoi fallback is a placeholder, not a legal boundary
+- [ ] React + Leaflet admin console and citizen view — **in progress**
+- [ ] Voice advisories (TTS) in Kannada/Tamil — plumbing exists, audio pending
+- [ ] Harden the frontend memo/report buttons against the live API endpoints
 
 ---
 
