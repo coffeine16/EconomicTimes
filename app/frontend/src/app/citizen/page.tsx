@@ -32,9 +32,17 @@ export default function CitizenHomePage() {
   const { data: fusion } = useSWR<FusionResponse>([city, "fusion"], () => api.cityFusion(city));
   const cells = useMemo(() => fusion?.cells ?? [], [fusion]);
 
+  // Ward id -> real name. Fusion cells carry only ward_id; the names live in
+  // wards.json, so without this every ward shows as "W256" instead of its name.
+  const { data: wardsResp } = useSWR([city, "wards"], () => api.cityWards(city));
+  const wardName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of wardsResp?.cells ?? []) m.set(c.ward_id, c.ward_name);
+    return m;
+  }, [wardsResp]);
+
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
-  const [showSearch, setShowSearch] = useState(false);
   const [search, setSearch] = useState("");
 
   const go = (wardId: string) => {
@@ -64,17 +72,24 @@ export default function CitizenHomePage() {
     );
   };
 
-  // search fallback (collapsed)
+  // Ward list for search — real names from wards.json, matched by name or id.
   const wards = useMemo(() => {
     const seen = new Set<string>();
-    return cells
-      .filter((c) => c.ward_id && !seen.has(c.ward_id) && seen.add(c.ward_id))
-      .map((c) => ({ ward_id: c.ward_id!, ward_name: (c as { ward_name?: string }).ward_name ?? c.ward_id! }));
-  }, [cells]);
-  const searchHits = useMemo(
-    () => (search.trim() ? wards.filter((w) => w.ward_name.toLowerCase().includes(search.toLowerCase())).slice(0, 8) : []),
-    [wards, search]
-  );
+    const out: { ward_id: string; ward_name: string }[] = [];
+    for (const c of cells) {
+      if (!c.ward_id || c.ward_id === "unassigned" || seen.has(c.ward_id)) continue;
+      seen.add(c.ward_id);
+      out.push({ ward_id: c.ward_id, ward_name: wardName.get(c.ward_id) ?? c.ward_id });
+    }
+    return out.sort((a, b) => a.ward_name.localeCompare(b.ward_name));
+  }, [cells, wardName]);
+  const searchHits = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return wards
+      .filter((w) => w.ward_name.toLowerCase().includes(q) || w.ward_id.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [wards, search]);
 
   // Live city snapshot — the citywide median AQI, and its worst wards right now.
   const cityAqi = useMemo(() => {
@@ -161,6 +176,48 @@ export default function CitizenHomePage() {
         </p>
       )}
 
+      {/* Search by ward name — always visible, live-matching */}
+      <div style={{ position: "relative", marginBottom: "var(--space-sm)" }}>
+        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)", pointerEvents: "none" }}>
+          🔍
+        </span>
+        <input
+          type="search"
+          placeholder="Search your ward by name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{ paddingLeft: 38, width: "100%" }}
+        />
+        {searchHits.length > 0 && (
+          <div
+            className="card"
+            style={{
+              position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+              zIndex: "var(--z-panel)", padding: 4, maxHeight: 280, overflowY: "auto",
+              boxShadow: "var(--shadow-lg)",
+            }}
+          >
+            {searchHits.map((w) => (
+              <button
+                key={w.ward_id}
+                onClick={() => go(w.ward_id)}
+                style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  width: "100%", padding: "9px 12px", borderRadius: "var(--radius-sm)",
+                  border: "none", background: "transparent", cursor: "pointer", textAlign: "left",
+                  color: "var(--text-primary)", fontSize: "0.88rem",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <span>{w.ward_name}</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "var(--text-tertiary)" }}>{w.ward_id}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <p style={{ textAlign: "center", fontSize: "0.8rem", color: "var(--text-tertiary)", margin: "var(--space-sm) 0" }}>
         …or tap your area on the map
       </p>
@@ -178,7 +235,7 @@ export default function CitizenHomePage() {
             {worstWards.map((w) => {
               const aqi = pm25ToAqi(w.pm25);
               const cat = getAqiCategory(aqi);
-              const name = wards.find((x) => x.ward_id === w.wid)?.ward_name ?? w.wid;
+              const name = wardName.get(w.wid) ?? w.wid;
               return (
                 <button
                   key={w.wid}
@@ -210,40 +267,6 @@ export default function CitizenHomePage() {
         </div>
       )}
 
-      {/* Search fallback (collapsed) */}
-      <div style={{ marginTop: "var(--space-md)", textAlign: "center" }}>
-        <button className="btn btn-ghost btn-sm" onClick={() => setShowSearch((s) => !s)}>
-          {showSearch ? "Hide search" : "Prefer to type? Search by name"}
-        </button>
-        {showSearch && (
-          <div style={{ marginTop: "var(--space-sm)", textAlign: "left" }}>
-            <input
-              type="search"
-              placeholder="Type your ward or locality…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              autoFocus
-            />
-            {searchHits.length > 0 && (
-              <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-                {searchHits.map((w) => (
-                  <button
-                    key={w.ward_id}
-                    className="card card-hover"
-                    onClick={() => go(w.ward_id)}
-                    style={{ textAlign: "left", padding: "8px 12px", cursor: "pointer", fontSize: "0.88rem" }}
-                  >
-                    {w.ward_name}
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.72rem", color: "var(--text-tertiary)", marginLeft: 8 }}>
-                      {w.ward_id}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

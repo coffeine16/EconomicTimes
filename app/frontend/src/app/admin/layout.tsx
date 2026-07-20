@@ -48,11 +48,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             }}
           >
             <span style={{ fontSize: "1.3rem" }}>⬡</span>
-            <span style={{ fontWeight: 700, fontSize: "0.95rem", letterSpacing: "-0.01em" }}>
+            <span className="hide-mobile" style={{ fontWeight: 700, fontSize: "0.95rem", letterSpacing: "-0.01em", whiteSpace: "nowrap" }}>
               AQ Intelligence
             </span>
           </Link>
           <span
+            className="hide-mobile"
             style={{
               width: 1, height: 16,
               background: "var(--border-default)",
@@ -60,12 +61,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             }}
           />
           <span
+            className="hide-mobile"
             style={{
               fontSize: "0.75rem",
               fontWeight: 600,
               color: "var(--accent-blue)",
               letterSpacing: "0.06em",
               textTransform: "uppercase",
+              whiteSpace: "nowrap",
             }}
           >
             Admin Console

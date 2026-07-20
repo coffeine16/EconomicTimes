@@ -48,6 +48,8 @@ interface Props {
   hourOffset: number;
   selectedCell: string | null;
   onCellClick: (cell: string | null) => void;
+  /** When this changes (e.g. the city), the map re-centres on the new data. */
+  recenterKey?: string;
 }
 
 export default function MapContainer({
@@ -63,6 +65,7 @@ export default function MapContainer({
   dispatchRoutes = [],
   selectedCell,
   onCellClick,
+  recenterKey,
 }: Props) {
   const [viewState, setViewState] = useState<{
     longitude: number; latitude: number; zoom: number; pitch: number; bearing: number;
@@ -85,19 +88,19 @@ export default function MapContainer({
   }, []);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
-  // Auto-center on whatever city the loaded data actually belongs to. The pipeline's
-  // "current city" is whatever ran last (Delhi/Chennai/Bengaluru); the map must not be
-  // hardcoded to one, or hotspots render ~1700 km off-screen (Bengaluru data under a
-  // Delhi viewport looks like an empty map). Fit once, to the first dataset that loads.
-  const didAutoFit = useRef(false);
+  // Auto-center on whatever city the loaded data belongs to, and RE-center whenever
+  // recenterKey (the city) changes — otherwise switching Delhi -> Chennai leaves the
+  // viewport 1700 km away and the map looks empty until you pan there by hand.
+  const fittedKey = useRef<string | null>(null);
   useEffect(() => {
-    if (didAutoFit.current) return;
+    const key = recenterKey ?? "default";
+    if (fittedKey.current === key) return;   // already centred for this city
     const cells =
       (hotspots.length && hotspots.map((h) => h.cell)) ||
       (wardCells.length && wardCells.map((w) => w.cell)) ||
       (fusionCells.length && fusionCells.map((f) => f.cell)) ||
       [];
-    if (!cells.length) return;
+    if (!cells.length) return;               // wait for this city's data to load
     let sumLat = 0, sumLon = 0, n = 0;
     for (const c of cells) {
       try {
@@ -106,9 +109,9 @@ export default function MapContainer({
       } catch { /* skip a malformed cell id */ }
     }
     if (!n) return;
-    didAutoFit.current = true;
-    setViewState((vs) => ({ ...vs, latitude: sumLat / n, longitude: sumLon / n }));
-  }, [hotspots, wardCells, fusionCells]);
+    fittedKey.current = key;
+    setViewState((vs) => ({ ...vs, latitude: sumLat / n, longitude: sumLon / n, zoom: 10.5 }));
+  }, [recenterKey, hotspots, wardCells, fusionCells]);
 
   const setTip = useCallback(
     (info: { x: number; y: number; content: React.ReactNode } | null) => setTooltip(info),

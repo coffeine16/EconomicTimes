@@ -35,7 +35,7 @@ export default function CitizenMap({
   interactive?: boolean;
 }) {
   const [view, setView] = useState({ longitude: 77.15, latitude: 28.6, zoom: 10.5, pitch: 0, bearing: 0 });
-  const didFit = useRef(false);
+  const fittedFor = useRef<string | null>(null);
 
   // theme-aware base map — reads the same data-theme the app toggles
   const [mapStyle, setMapStyle] = useState(DARK_STYLE);
@@ -48,9 +48,13 @@ export default function CitizenMap({
     return () => obs.disconnect();
   }, []);
 
-  // fit to the highlighted ward if given, else to all cells
+  // Fit to the highlighted ward if given, else to all cells. Re-fits when the data
+  // moves to a new city or a new ward — keyed on a signature of (first cell + ward),
+  // so switching Delhi -> Chennai actually flies the map there.
   useEffect(() => {
-    if (didFit.current || !cells.length) return;
+    if (!cells.length) return;
+    const sig = `${cells[0].cell}|${highlightWard ?? ""}`;
+    if (fittedFor.current === sig) return;
     const target = highlightWard ? cells.filter((c) => c.ward_id === highlightWard) : cells;
     const use = target.length ? target : cells;
     let sLat = 0, sLon = 0, n = 0;
@@ -58,7 +62,7 @@ export default function CitizenMap({
       try { const [lat, lon] = cellToLatLng(c.cell); sLat += lat; sLon += lon; n++; } catch {}
     }
     if (!n) return;
-    didFit.current = true;
+    fittedFor.current = sig;
     setView((v) => ({ ...v, latitude: sLat / n, longitude: sLon / n, zoom: highlightWard ? 12.5 : 10.5 }));
   }, [cells, highlightWard]);
 

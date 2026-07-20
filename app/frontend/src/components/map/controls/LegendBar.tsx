@@ -4,7 +4,9 @@
  * Shows whichever legend is most contextual based on active layers.
  * PM2.5 → AQI color ramp (fusion/hotspot), fire dot, station dot.
  */
+import { useState } from "react";
 import { AQI_BREAKPOINTS } from "@/lib/colors";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 import type { LayerVisibility } from "@/lib/types";
 
 interface Props {
@@ -91,6 +93,8 @@ function BlindSpotLegend() {
 }
 
 export default function LegendBar({ layers }: Props) {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = useState(true);
   const sections: React.ReactNode[] = [];
   if (layers.fusion || layers.hotspots) sections.push(<ColorRamp key="ramp" />);
   if (layers.hotspots) sections.push(<PersistenceLegend key="persist" />);
@@ -99,23 +103,46 @@ export default function LegendBar({ layers }: Props) {
 
   if (sections.length === 0) return null;
 
+  // On a phone the stacked legend covers the map, so collapse it to a chip you tap.
+  if (isMobile && !open) {
+    return (
+      <button
+        className="glass btn btn-sm"
+        onClick={() => setOpen(true)}
+        style={{ position: "absolute", bottom: 140, right: 12, zIndex: "var(--z-overlay)" }}
+      >
+        🗺️ Legend
+      </button>
+    );
+  }
+
   return (
     <div
       className="glass"
       style={{
         position: "absolute",
-        bottom: 80,
+        bottom: isMobile ? 140 : 80,
         right: 12,
         zIndex: "var(--z-overlay)",
         padding: "10px 14px",
         borderRadius: "var(--radius-md)",
         minWidth: 160,
         maxWidth: 200,
+        maxHeight: isMobile ? "42vh" : undefined,
+        overflowY: isMobile ? "auto" : undefined,
         display: "flex",
         flexDirection: "column",
         gap: "var(--space-md)",
       }}
     >
+      {isMobile && (
+        <button
+          onClick={() => setOpen(false)}
+          style={{ position: "absolute", top: 4, right: 6, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", fontSize: "0.8rem" }}
+        >
+          ✕
+        </button>
+      )}
       {sections.map((s, i) => (
         <div key={i}>
           {i > 0 && (

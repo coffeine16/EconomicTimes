@@ -158,6 +158,7 @@ export default function AdminPage() {
           hourOffset={hourOffset}
           selectedCell={selectedCell}
           onCellClick={setSelectedCell}
+          recenterKey={city}
         />
       </div>
 

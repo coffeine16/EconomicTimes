@@ -19,7 +19,11 @@ export default function AgentControlBar({ agents, running, onRun, onReset }: Pro
         alignItems: "center",
         gap: "var(--space-sm)",
         padding: "8px var(--space-md)",
-        flexWrap: "wrap",
+        // No wrap — the parent scrolls this row horizontally on narrow screens, so
+        // the agent tabs stay one line and don't collide with the map controls.
+        flexWrap: "nowrap",
+        width: "max-content",
+        minWidth: "100%",
       }}
     >
       {/* Run All */}
