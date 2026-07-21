@@ -4,6 +4,8 @@
  * Ranked by satellite signal; best placement candidates pulse bright yellow.
  */
 import { H3HexagonLayer } from "@deck.gl/geo-layers";
+import { BLINDSPOT_HEX, hexToRgba } from "@/lib/colors";
+import { icon, Eye } from "@/components/Icon";
 import type { BlindSpot } from "@/lib/types";
 
 export function buildBlindSpotLayer(
@@ -21,9 +23,10 @@ export function buildBlindSpotLayer(
     getHexagon: (d) => d.cell,
     getFillColor: (d) => {
       const t = d.satellite_signal / maxSig;
-      return [253, 224, 71, Math.round(60 + t * 120)];  // yellow, intensity scaled
+      const [r, g, b] = hexToRgba(BLINDSPOT_HEX);
+      return [r, g, b, Math.round(55 + t * 115)];  // intensity scales with signal
     },
-    getLineColor: [253, 224, 71, 200],
+    getLineColor: hexToRgba(BLINDSPOT_HEX, 195),
     lineWidthMinPixels: 1.5,
     extruded: false,
     wireframe: true,
@@ -38,8 +41,9 @@ export function buildBlindSpotLayer(
           y: info.y,
           content: (
             <div style={{ minWidth: 200 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4, color: "#fde047" }}>
-                👁 Monitoring Blind Spot
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, marginBottom: 4 }}>
+                <Eye {...icon.sm} aria-hidden />
+                Monitoring blind spot
               </div>
               <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 4 }}>
                 Satellite signal: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
@@ -47,7 +51,7 @@ export function buildBlindSpotLayer(
                 </span>
               </div>
               <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                Placement rank: <span style={{ fontFamily: "var(--font-mono)", color: "#fde047" }}>#{d.rank}</span>
+                Placement rank: <span className="mono" style={{ color: "var(--text-primary)" }}>#{d.rank}</span>
               </div>
               <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginTop: 6 }}>
                 {d.ward_id} · {d.cell.slice(0, 10)}…

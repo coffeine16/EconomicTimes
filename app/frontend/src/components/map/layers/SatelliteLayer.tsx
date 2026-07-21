@@ -7,8 +7,10 @@
  * field the detector runs neighbourhood-contrast on, so showing it explains WHY a
  * hotspot fired — the raw signal beneath the attribution.
  *
- * A distinct purple ramp (not the fusion green-red) so the two choropleths stay
- * legible when both are toggled on.
+ * A distinct desaturated violet ramp (not the fusion green→maroon) so the two
+ * choropleths stay legible when both are toggled on. Muted on purpose: this is a
+ * CONTEXT layer explaining why a hotspot fired, and it must never out-shout the
+ * hotspots themselves. It used to run to near-fluorescent magenta.
  */
 import { H3HexagonLayer } from "@deck.gl/geo-layers";
 
@@ -17,14 +19,14 @@ export interface SatelliteCell {
   no2: number;
 }
 
-// Low -> high NO2, dark violet to bright magenta. Alpha climbs so faint columns
-// don't clutter the map.
+// Low -> high NO2: deep indigo to a soft heather. Alpha climbs so faint columns
+// don't clutter the map. ↔ --sat-no2 family in lib/colors.ts.
 function no2ToColor(no2: number, min: number, max: number): [number, number, number, number] {
   const t = max > min ? (no2 - min) / (max - min) : 0.5;
-  const r = Math.round(60 + t * 195);   //  60 -> 255
-  const g = Math.round(20 + t * 40);    //  20 ->  60
-  const b = Math.round(120 + t * 100);  // 120 -> 220
-  const a = Math.round(70 + t * 140);   //  70 -> 210
+  const r = Math.round(0x4a + t * 0x7f);  // 74 -> 201
+  const g = Math.round(0x45 + t * 0x69);  // 69 -> 174
+  const b = Math.round(0x78 + t * 0x62);  // 120 -> 218
+  const a = Math.round(60 + t * 130);     //  60 -> 190
   return [r, g, b, a];
 }
 

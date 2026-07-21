@@ -4,6 +4,8 @@
  * Sized by FRP (fire radiative power), pulsing red/orange.
  */
 import { ScatterplotLayer } from "@deck.gl/layers";
+import { FIRE_HEX, hexToRgba } from "@/lib/colors";
+import { icon, Flame } from "@/components/Icon";
 import type { FireDetection } from "@/hooks/useMapData";
 
 export function buildFireLayer(
@@ -19,14 +21,10 @@ export function buildFireLayer(
     radiusMinPixels: 4,
     radiusMaxPixels: 24,
     getFillColor: (d) => {
-      // High confidence = vivid red; low = amber
-      const r = d.confidence >= 0.7 ? 239 : 245;
-      const g = d.confidence >= 0.7 ? 68 : 158;
-      const b = 11;
-      const a = Math.round(180 + d.confidence * 60);
-      return [r, g, b, a];
+      const [r, g, b] = hexToRgba(d.confidence >= 0.7 ? FIRE_HEX.high : FIRE_HEX.low);
+      return [r, g, b, Math.round(175 + d.confidence * 60)];
     },
-    getLineColor: [255, 200, 50, 180],
+    getLineColor: [255, 255, 255, 90],
     lineWidthMinPixels: 1,
     stroked: true,
     pickable: true,
@@ -43,7 +41,10 @@ export function buildFireLayer(
           y: info.y,
           content: (
             <div style={{ minWidth: 180 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>🔥 FIRMS Detection</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, marginBottom: 4 }}>
+                <Flame {...icon.sm} aria-hidden />
+                FIRMS detection
+              </div>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.85rem", marginBottom: 4 }}>
                 FRP: {d.frp.toFixed(1)} MW
               </div>

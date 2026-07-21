@@ -7,6 +7,7 @@
 import { useMemo } from "react";
 import { ScatterplotLayer } from "@deck.gl/layers";
 import { pm25ToRgbaArray } from "@/lib/colors";
+import { icon, MapPin } from "@/components/Icon";
 import type { Station } from "@/hooks/useMapData";
 
 // Returns a Deck.gl layer instance (or null if empty / hidden)
@@ -41,7 +42,10 @@ export function buildStationLayer(
           y: info.y,
           content: (
             <div style={{ minWidth: 180 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>📍 {d.station_name}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, marginBottom: 4 }}>
+                <MapPin {...icon.sm} aria-hidden style={{ flexShrink: 0 }} />
+                {d.station_name}
+              </div>
               <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.9rem", marginBottom: 4 }}>
                 PM2.5: {d.pm25.toFixed(1)} µg/m³
               </div>
@@ -55,8 +59,8 @@ export function buildStationLayer(
                   NO₂: {d.no2.toFixed(2)} mol/m²
                 </div>
               )}
-              <div style={{ fontSize: "0.7rem", color: d.freshness_h <= 2 ? "var(--accent-emerald)" : "var(--text-tertiary)", marginTop: 6 }}>
-                {d.freshness_h <= 2 ? "🟢 Fresh" : `⚠ ${d.freshness_h}h stale`} · {d.ward_id}
+              <div style={{ fontSize: "0.7rem", color: d.freshness_h <= 2 ? "var(--positive)" : "var(--caution)", marginTop: 6 }}>
+                {d.freshness_h <= 2 ? "Fresh" : `${d.freshness_h}h stale`} · {d.ward_id}
               </div>
             </div>
           ),

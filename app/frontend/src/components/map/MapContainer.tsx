@@ -12,7 +12,7 @@ import { cellToLatLng } from "h3-js";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { INITIAL_VIEW_STATE, MAP_STYLE } from "@/lib/constants";
-import { pm25ToRgbaArray, SEVERITY_COLORS, hexToRgba } from "@/lib/colors";
+import { pm25ToRgbaArray, SEVERITY_COLORS, hexToRgba, UNKNOWN_HEX } from "@/lib/colors";
 import type { FusionCell, Hotspot, LayerVisibility, MapFilters, DispatchRoute, BlindSpot } from "@/lib/types";
 import type { Station, FireDetection } from "@/hooks/useMapData";
 
@@ -24,6 +24,7 @@ import { buildDispatchLayers } from "./layers/DispatchLayer";
 import { buildSatelliteLayer, type SatelliteCell } from "./layers/SatelliteLayer";
 import LegendBar from "./controls/LegendBar";
 import { useIsMobile } from "@/hooks/useMediaQuery";
+import { icon, Crosshair, Flame } from "@/components/Icon";
 
 // ── Tooltip state ─────────────────────────────────────────────────────────────
 
@@ -51,6 +52,10 @@ interface Props {
   onCellClick: (cell: string | null) => void;
   /** When this changes (e.g. the city), the map re-centres on the new data. */
   recenterKey?: string;
+  /** False while a compact-layout sheet covers the bottom of the map — the
+   *  legend and recentre button hide rather than sitting under an opaque
+   *  panel where they are visible-but-untappable. */
+  showOverlays?: boolean;
 }
 
 export default function MapContainer({
@@ -67,6 +72,7 @@ export default function MapContainer({
   selectedCell,
   onCellClick,
   recenterKey,
+  showOverlays = true,
 }: Props) {
   const [viewState, setViewState] = useState<{
     longitude: number; latitude: number; zoom: number; pitch: number; bearing: number;
@@ -176,8 +182,8 @@ export default function MapContainer({
       id: "hotspot-zones",
       data: hotspots,
       getHexagon: (d) => d.cell,
-      getFillColor: (d) => SEVERITY_COLORS[d.kind]?.fill ?? hexToRgba("#888", 100),
-      getLineColor: (d) => SEVERITY_COLORS[d.kind]?.border ?? hexToRgba("#888", 200),
+      getFillColor: (d) => SEVERITY_COLORS[d.kind]?.fill ?? hexToRgba(UNKNOWN_HEX, 100),
+      getLineColor: (d) => SEVERITY_COLORS[d.kind]?.border ?? hexToRgba(UNKNOWN_HEX, 200),
       getLineWidth: (d) => (d.kind === "chronic" ? 3 : d.kind === "emerging" ? 2 : 1.5),
       lineWidthMinPixels: 1.5,
       extruded: false,
@@ -200,7 +206,11 @@ export default function MapContainer({
                 <div style={{ color: "var(--text-tertiary)", fontSize: "0.75rem", marginTop: 4 }}>
                   Severity: {(d.severity * 100).toFixed(0)}% ·{" "}
                   {d.attributable ? "Enforceable" : "Diffuse"}
-                  {d.fires_6h > 0 && ` · 🔥 ${d.fires_6h} fires`}
+                  {d.fires_6h > 0 && (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 3, marginLeft: 4, color: "var(--persist-acute)" }}>
+                      <Flame {...icon.sm} aria-hidden /> {d.fires_6h}
+                    </span>
+                  )}
                 </div>
                 <div style={{ color: "var(--text-tertiary)", fontSize: "0.7rem", marginTop: 4, maxWidth: 240 }}>
                   {d.detection_basis}
@@ -278,38 +288,27 @@ export default function MapContainer({
 
       {/* Recentre — snap back to the city after panning away (Google-Maps style).
           Sits above the legend so the two never collide. */}
-      <button
-        onClick={recenter}
-        title="Recentre on the city"
-        aria-label="Recentre map on the city"
-        style={{
-          position: "absolute",
-          right: 12,
-          bottom: isMobile ? 196 : 232,
-          zIndex: "var(--z-overlay)",
-          width: 38, height: 38, borderRadius: "50%",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          background: "var(--bg-primary)",
-          border: "1px solid var(--border-default)",
-          boxShadow: "var(--shadow-md)",
-          color: "var(--text-secondary)",
-          cursor: "pointer", fontSize: "1.05rem", lineHeight: 1,
-          transition: "color var(--transition-fast), border-color var(--transition-fast)",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = "var(--accent-blue)";
-          e.currentTarget.style.borderColor = "var(--accent-blue)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = "var(--text-secondary)";
-          e.currentTarget.style.borderColor = "var(--border-default)";
-        }}
-      >
-        ⌖
-      </button>
+      {showOverlays && (
+        <button
+          onClick={recenter}
+          title="Recentre on the city"
+          aria-label="Recentre map on the city"
+          className="map-btn"
+          style={{
+            position: "absolute",
+            right: 12,
+            bottom: isMobile ? 172 : 232,
+            zIndex: "var(--z-overlay)",
+            width: isMobile ? 40 : 32,
+            height: isMobile ? 40 : 32,
+          }}
+        >
+          <Crosshair {...icon.md} aria-hidden />
+        </button>
+      )}
 
       {/* Context-sensitive legend */}
-      <LegendBar layers={layers} />
+      {showOverlays && <LegendBar layers={layers} />}
 
       {/* Hover tooltip */}
       {tooltip && (
@@ -319,14 +318,15 @@ export default function MapContainer({
             position: "absolute",
             left: Math.min(tooltip.x + 12, window.innerWidth - 300),
             top: Math.min(tooltip.y + 12, window.innerHeight - 200),
-            padding: "10px 14px",
-            borderRadius: "var(--radius-md)",
+            padding: "9px 12px",
+            borderRadius: "var(--radius-lg)",
             pointerEvents: "none",
             zIndex: "var(--z-overlay)",
             maxWidth: 280,
-            fontSize: "0.85rem",
+            fontSize: "0.8125rem",
+            lineHeight: 1.5,
             boxShadow: "var(--shadow-lg)",
-            animation: "fadeIn 0.12s ease-out",
+            animation: "fadeIn 0.1s var(--ease) both",
           }}
         >
           {tooltip.content}

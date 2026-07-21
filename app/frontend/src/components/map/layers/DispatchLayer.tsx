@@ -5,16 +5,20 @@
  * Stop positions are rendered as pins with EPS labels.
  */
 import { LineLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
+import { icon, Truck } from "@/components/Icon";
 import type { DispatchRoute, DispatchStop } from "@/lib/types";
 
-// One distinct hue per team (up to 6 teams)
+// One hue per team, up to 6. Muted and evenly spaced around the wheel: these
+// identify a route, they do not rank it, so none of them may read as an alert.
+// (The old set was the Tailwind-500 rainbow, and its red/amber members collided
+// with the severity colours the hotspot layer draws underneath.)
 const TEAM_COLORS: [number, number, number, number][] = [
-  [99,  102, 241, 220],  // indigo  — T1
-  [16,  185, 129, 220],  // emerald — T2
-  [245, 158,  11, 220],  // amber   — T3
-  [239,  68,  68, 220],  // red     — T4
-  [59,  130, 246, 220],  // blue    — T5
-  [168,  85, 247, 220],  // purple  — T6
+  [110, 143, 192, 225],  // steel blue  — T1
+  [ 94, 168, 138, 225],  // sage        — T2
+  [186, 150,  86, 225],  // brass       — T3
+  [174, 122, 158, 225],  // mauve       — T4
+  [123, 156, 173, 225],  // slate cyan  — T5
+  [163, 149, 118, 225],  // khaki       — T6
 ];
 
 function teamColor(teamId: string): [number, number, number, number] {
@@ -82,14 +86,17 @@ export function buildDispatchLayers(
           y: info.y,
           content: (
             <div style={{ minWidth: 180 }}>
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>🚗 Dispatch Stop #{stop.seq}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, marginBottom: 4 }}>
+                <Truck {...icon.sm} aria-hidden />
+                Dispatch stop #{stop.seq}
+              </div>
               <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 2 }}>
                 Team {team_id} · Zone {stop.zone_id}
               </div>
               <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
                 Ward {stop.ward_id}
               </div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--accent-amber)", marginTop: 4 }}>
+              <div className="mono" style={{ fontSize: "0.8rem", color: "var(--caution)", marginTop: 4 }}>
                 EPS: {stop.eps.toFixed(1)}
               </div>
             </div>

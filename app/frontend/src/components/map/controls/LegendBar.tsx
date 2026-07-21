@@ -1,93 +1,58 @@
 "use client";
 /**
- * LegendBar — fixed bottom-right panel.
- * Shows whichever legend is most contextual based on active layers.
- * PM2.5 → AQI color ramp (fusion/hotspot), fire dot, station dot.
+ * LegendBar — bottom-right key, showing whichever sections the active layers
+ * make relevant.
+ *
+ * ⚠ It reads AQI_CATEGORIES / PERSISTENCE_HEX / FIRE_HEX from lib/colors.ts —
+ * the same module the deck.gl layers colour from. It used to hardcode its OWN
+ * AQI swatches (#22c55e, #fde047, #7f1d1d…), so the legend and the choropleth it
+ * explained were different colours. A legend that lies is worse than no legend.
  */
 import { useState } from "react";
-import { AQI_BREAKPOINTS } from "@/lib/colors";
+import { AQI_CATEGORIES, PERSISTENCE_HEX, FIRE_HEX, BLINDSPOT_HEX } from "@/lib/colors";
 import { useIsMobile } from "@/hooks/useMediaQuery";
+import { icon, X, ListChecks } from "@/components/Icon";
 import type { LayerVisibility } from "@/lib/types";
 
 interface Props {
   layers: LayerVisibility;
 }
 
-const AQI_LABELS = [
-  { label: "Good",      range: "0–50",   color: "#22c55e" },
-  { label: "Satisf.",   range: "51–100",  color: "#86efac" },
-  { label: "Moderate",  range: "101–200", color: "#fde047" },
-  { label: "Poor",      range: "201–300", color: "#fb923c" },
-  { label: "Very Poor", range: "301–400", color: "#ef4444" },
-  { label: "Severe",    range: "400+",    color: "#7f1d1d" },
-];
-
-function ColorRamp() {
+function Swatch({ color, round = false }: { color: string; round?: boolean }) {
   return (
-    <div>
-      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-        PM2.5 (India NAQI AQI)
-      </div>
-      {AQI_LABELS.map(({ label, range, color }) => (
-        <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: color, flexShrink: 0 }} />
-          <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", flex: 1 }}>{label}</span>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.65rem", color: "var(--text-tertiary)" }}>{range}</span>
-        </div>
-      ))}
+    <span
+      aria-hidden
+      style={{
+        width: 10, height: 10, flexShrink: 0,
+        borderRadius: round ? "50%" : 2,
+        background: color,
+        boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.18)",
+      }}
+    />
+  );
+}
+
+function Row({ color, label, value, round }: {
+  color: string; label: string; value?: string; round?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 7, minHeight: 18 }}>
+      <Swatch color={color} round={round} />
+      <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)", flex: 1 }}>{label}</span>
+      {value && (
+        <span className="mono" style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>
+          {value}
+        </span>
+      )}
     </div>
   );
 }
 
-function PersistenceLegend() {
+function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-        Hotspot Type
-      </div>
-      {[
-        { kind: "chronic",  color: "var(--persist-chronic)",  label: "Chronic (30d)" },
-        { kind: "emerging", color: "var(--persist-emerging)", label: "Emerging (7d)" },
-        { kind: "acute",    color: "var(--persist-acute)",    label: "Acute (24h)"   },
-      ].map(({ kind, color, label }) => (
-        <div key={kind} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-          <div style={{ width: 12, height: 12, borderRadius: 2, background: color, flexShrink: 0 }} />
-          <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FireLegend() {
-  return (
-    <div>
-      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-        FIRMS Detections
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-        <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ef4444", flexShrink: 0 }} />
-        <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>High confidence</span>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#f59e0b", flexShrink: 0 }} />
-        <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>Low confidence</span>
-      </div>
-    </div>
-  );
-}
-
-function BlindSpotLegend() {
-  return (
-    <div>
-      <div style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-        Blind Spots
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <div style={{ width: 12, height: 12, borderRadius: 2, background: "#fde047", opacity: 0.7, flexShrink: 0 }} />
-        <span style={{ fontSize: "0.7rem", color: "var(--text-secondary)" }}>No monitor — satellite high</span>
-      </div>
-      <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: 4 }}>Brighter = higher rank</div>
+      <div className="section-label" style={{ marginBottom: 6 }}>{title}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>{children}</div>
     </div>
   );
 }
@@ -95,23 +60,57 @@ function BlindSpotLegend() {
 export default function LegendBar({ layers }: Props) {
   const isMobile = useIsMobile();
   const [open, setOpen] = useState(true);
+
   const sections: React.ReactNode[] = [];
-  if (layers.fusion || layers.hotspots) sections.push(<ColorRamp key="ramp" />);
-  if (layers.hotspots) sections.push(<PersistenceLegend key="persist" />);
-  if (layers.fires) sections.push(<FireLegend key="fire" />);
-  if (layers.blindspots) sections.push(<BlindSpotLegend key="blind" />);
+
+  if (layers.fusion || layers.hotspots) {
+    sections.push(
+      <Group key="aqi" title="PM2.5 · India NAQI">
+        {AQI_CATEGORIES.map((c) => (
+          <Row key={c.label} color={c.color} label={c.label} value={c.range} />
+        ))}
+      </Group>
+    );
+  }
+  if (layers.hotspots) {
+    sections.push(
+      <Group key="persist" title="Hotspot type">
+        <Row color={PERSISTENCE_HEX.chronic}  label="Chronic · 30d" />
+        <Row color={PERSISTENCE_HEX.emerging} label="Emerging · 7d" />
+        <Row color={PERSISTENCE_HEX.acute}    label="Acute · 24h" />
+      </Group>
+    );
+  }
+  if (layers.fires) {
+    sections.push(
+      <Group key="fire" title="FIRMS detections">
+        <Row round color={FIRE_HEX.high} label="High confidence" />
+        <Row round color={FIRE_HEX.low}  label="Low confidence" />
+      </Group>
+    );
+  }
+  if (layers.blindspots) {
+    sections.push(
+      <Group key="blind" title="Blind spots">
+        <Row color={BLINDSPOT_HEX} label="No monitor, satellite high" />
+        <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: 2 }}>
+          Brighter = higher placement rank
+        </div>
+      </Group>
+    );
+  }
 
   if (sections.length === 0) return null;
 
-  // On a phone the stacked legend covers the map, so collapse it to a chip you tap.
   if (isMobile && !open) {
     return (
       <button
         className="glass btn btn-sm"
         onClick={() => setOpen(true)}
-        style={{ position: "absolute", bottom: 140, right: 12, zIndex: "var(--z-overlay)" }}
+        style={{ position: "absolute", bottom: 116, right: 12, zIndex: "var(--z-overlay)" }}
       >
-        🗺️ Legend
+        <ListChecks {...icon.sm} aria-hidden />
+        Legend
       </button>
     );
   }
@@ -119,35 +118,37 @@ export default function LegendBar({ layers }: Props) {
   return (
     <div
       className="glass"
+      aria-label="Map legend"
       style={{
         position: "absolute",
-        bottom: isMobile ? 140 : 80,
+        bottom: isMobile ? 116 : 80,
         right: 12,
         zIndex: "var(--z-overlay)",
-        padding: "10px 14px",
-        borderRadius: "var(--radius-md)",
-        minWidth: 160,
-        maxWidth: 200,
+        padding: "10px 12px",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-md)",
+        minWidth: 168,
+        maxWidth: 208,
         maxHeight: isMobile ? "42vh" : undefined,
         overflowY: isMobile ? "auto" : undefined,
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-md)",
+        gap: 12,
       }}
     >
       {isMobile && (
         <button
           onClick={() => setOpen(false)}
-          style={{ position: "absolute", top: 4, right: 6, border: "none", background: "transparent", cursor: "pointer", color: "var(--text-tertiary)", fontSize: "0.8rem" }}
+          className="btn btn-quiet btn-icon"
+          aria-label="Hide legend"
+          style={{ position: "absolute", top: 4, right: 4, minHeight: 0, padding: 3 }}
         >
-          ✕
+          <X {...icon.sm} aria-hidden />
         </button>
       )}
       {sections.map((s, i) => (
         <div key={i}>
-          {i > 0 && (
-            <div style={{ borderTop: "1px solid var(--border-subtle)", marginBottom: "var(--space-md)" }} />
-          )}
+          {i > 0 && <hr style={{ margin: "0 0 12px" }} />}
           {s}
         </div>
       ))}

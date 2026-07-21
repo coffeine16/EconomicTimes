@@ -22,7 +22,7 @@ export function buildWardLayer(
     data: cells,
     getHexagon: (d) => d.cell,
     getFillColor: [0, 0, 0, 0],            // fully transparent fill
-    getLineColor: [255, 255, 255, 28],     // very subtle white outline
+    getLineColor: [255, 255, 255, 22],     // very subtle white outline
     lineWidthMinPixels: 0.5,
     lineWidthMaxPixels: 1,
     extruded: false,
