@@ -81,6 +81,14 @@ function ToastRow({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) 
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  // The portal must NOT render on the first client pass either, or hydration
+  // mismatches: `typeof document !== "undefined"` is false on the server and true
+  // on the client, so React finds a <div> where the server sent none and throws
+  // the whole tree away (visible flicker, and it cascades into a bogus
+  // "script tag while rendering" error from the theme script in <head>).
+  // Mounting in an effect makes the first client render match the server exactly.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const nextId = useRef(0);
 
   const dismiss = useCallback((id: number) => {
@@ -110,7 +118,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {typeof document !== "undefined" &&
+      {mounted &&
         createPortal(
           <div
             className="toast-viewport"
