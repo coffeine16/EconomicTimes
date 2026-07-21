@@ -1,0 +1,47 @@
+{
+  "generated_from": "scripts/eval_detection.py + scripts/eval_attribution.py on the synthetic world (ingestion/synthetic.py), which is the only world where ground truth exists and accuracy can be scored.",
+  "why_synthetic": "Real cities have no ground-truth emission inventory to score against. The synthetic world is deliberately adversarial: different dispersion physics than the scorer, sources that appear on no map, decoy sites that emit nothing, and a satellite blurred to its real ~5.5 km footprint.",
+  "detection": {
+    "headline": "Recall is reported BY WHAT THE INSTRUMENTS CAN PHYSICALLY SEE, not as one number.",
+    "tiers": [
+      {
+        "tier": "direct — thermal fire",
+        "sources": "waste burning",
+        "found": 2,
+        "total": 2,
+        "named_correctly": 2,
+        "note": "Both appear on NO MAP AT ALL — unregistered. That is the real result."
+      },
+      {
+        "tier": "NO₂, confounded",
+        "sources": "industrial, traffic",
+        "found": 0,
+        "total": 4,
+        "named_correctly": 0,
+        "note": "NO₂ is a real combustion tracer, but the road network lifts it across the whole core, so a point source must out-shout its own neighbourhood. Hard, not impossible — on real Delhi this tier did surface industrial zones."
+      },
+      {
+        "tier": "no tracer at all",
+        "sources": "construction",
+        "found": 0,
+        "total": 3,
+        "named_correctly": 0,
+        "note": "Coarse PM. It has no satellite tracer and it does not burn. Nothing we have sees it."
+      }
+    ],
+    "zone_precision": { "correct": 2, "total": 2, "unit": "enforceable zones (each = one inspector dispatched)" },
+    "cell_precision": { "correct": 10, "total": 11, "note": "the shortfall is plume extent INSIDE correctly-found zones, not false accusations" },
+    "diffuse_excluded": 1
+  },
+  "attribution": {
+    "accuracy": { "correct": 3, "total": 3 },
+    "unregistered": { "correct": 3, "total": 3, "note": "every source named was one that appears on no map" },
+    "by_kind": { "chronic": "2/2", "acute": "1/1" }
+  },
+  "caveats": [
+    "SMALL n. 2 detectable sources and 2 zones is not a rate. By our own principle 8, a clean number deserves suspicion before applause.",
+    "We previously reported 4/4 detection recall. It rested on SO₂ contrast, and real Sentinel-5P SO₂ over a city is noise (SNR 0.66–0.87, 49% of values negative). We deleted the channel and the number fell to 2/4. The instrument model had been kinder than the instrument.",
+    "'0 of 9 sources sit within 2 km of a monitor' is NOT a finding — it is an assumption of the world model. pick_station_cells() excludes each source's k=2 ring, so it is true ~99% of the time by construction. The empirical version, which owes nothing to our placement rule: an unbiased 12-monitor network catches a median of 1 source in 9.",
+    "Detection recall is invariant to where monitors sit (it reads satellite + FIRMS and never touches a station). Fusion LOSO is not, and moves with siting — as it must. That contrast is the evidence the headline is not an artefact of a rule we invented."
+  ]
+}
