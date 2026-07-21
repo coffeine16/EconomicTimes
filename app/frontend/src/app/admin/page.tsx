@@ -64,9 +64,29 @@ export default function AdminPage() {
 
   const allHotspots = useMemo(() => rawHotspots ?? [], [rawHotspots]);
   const hotspots = useMemo(() => filterHotspots(allHotspots, filters), [allHotspots, filters]);
-  const fusionCells = fusionResp?.cells ?? [];
   const wardCells = wardsResp?.cells ?? [];
   const blindSpots = audit?.blind_spots ?? [];
+
+  // Forecast horizon: 0 = the live fusion field, 24/48/72 = the forecast agent's
+  // predicted PM2.5 for that horizon. The choropleth switches between them, so the
+  // time control actually drives the map (it used to be a dead control).
+  const { data: horizonForecast } = useSWR(
+    hourOffset > 0 ? [city, "forecast", hourOffset] : null,
+    () => api.cityForecast(city, hourOffset as 24 | 48 | 72)
+  );
+  const wardOf = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of wardCells) m.set(c.cell, c.ward_id);
+    return m;
+  }, [wardCells]);
+  const fusionCells = useMemo(() => {
+    if (hourOffset === 0) return fusionResp?.cells ?? [];
+    return (horizonForecast ?? []).map((f) => ({
+      cell: f.cell,
+      ward_id: wardOf.get(f.cell) ?? "unassigned",
+      pm25: f.pm25_hat,
+    }));
+  }, [hourOffset, fusionResp, horizonForecast, wardOf]);
 
   // ── Agent pipeline ──────────────────────────────────────────────────────────
   const onAgentComplete = useCallback(() => {

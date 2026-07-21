@@ -20,6 +20,7 @@ import { api } from "@/lib/api";
 import type { Hotspot, Attribution, Memo } from "@/lib/types";
 import { SOURCE_LABELS, PERSISTENCE_LABELS } from "@/lib/constants";
 import { SOURCE_COLORS } from "@/lib/colors";
+import { useCity } from "@/lib/CityContext";
 import MemoModal from "./MemoModal";
 
 interface Props {
@@ -208,9 +209,10 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const { city } = useCity();
   const [expanded, setExpanded] = useState(isSelected);
   const { data: attribution, isLoading: loadingAttr } = useSWR<Attribution>(
-    expanded ? ["attribution", zone.lead_cell] : null,
+    expanded ? [city, "attribution", zone.lead_cell] : null,
     () => api.getAttribution(zone.lead_cell)
   );
   const sourceColor = attribution ? SOURCE_COLORS[attribution.primary_source] : "#888";
@@ -228,7 +230,7 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
     setMemoError(null);
     setMemo(null);
     try {
-      setMemo(await api.getMemo(zone.zone_id));
+      setMemo(await api.getMemo(zone.zone_id, city));
     } catch {
       setMemoError(`No memo for zone ${zone.zone_id}. Run the pipeline to draft one.`);
     } finally {

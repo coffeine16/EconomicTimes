@@ -182,17 +182,23 @@ export const api = {
   // read-only). "Generate memo" fetches a document that already exists. Accepts an
   // action_id OR a zone_id — the backend matches either. When the backend is down,
   // fall back to the static memos.json and match client-side (demo insurance).
-  getMemo: async (id: string): Promise<Memo> => {
-    try {
-      return await apiFetch<Memo>(`/memo/${id}`);
-    } catch {
-      const res = await fetch("/data/memos.json");
-      if (!res.ok) throw new Error("memo unavailable");
-      const memos = (await res.json()) as Memo[];
+  // `city` matters: memos are per-city, so a Chennai zone must not resolve against
+  // Delhi's memo file.
+  getMemo: async (id: string, city?: string): Promise<Memo> => {
+    const local = async () => {
+      const memos = city
+        ? await cityFetch<Memo[]>(city, "memos.json", [])
+        : ((await (await fetch("/data/memos.json")).json()) as Memo[]);
       const memo = memos.find(
         (m) => m.action_id === id || m.zone_id === id || m.memo_id === id
       );
       if (!memo) throw new Error(`no memo for ${id}`);
+      return memo;
+    };
+    try {
+      return await apiFetch<Memo>(`/memo/${id}`);
+    } catch {
+      const memo = await local();
       return memo;
     }
   },
