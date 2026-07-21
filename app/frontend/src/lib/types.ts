@@ -321,6 +321,21 @@ export interface Memo {
   evidence_chain: string[];
   drafted_by: string;
   disclaimer: string;
+  /** The deterministic situation the memo agent scored, shipped alongside the
+   *  prose. Optional because it is the agent's own summary, not part of the
+   *  document — the modal renders it as a scannable header strip so an officer
+   *  gets severity/source/confidence before reading a paragraph. */
+  situation?: MemoSituation;
+}
+
+export interface MemoSituation {
+  source: string;
+  confidence: number;
+  pm25: number;
+  aqi: number;
+  aqi_category: string;
+  kind: HotspotKind;
+  n_cells: number;
 }
 
 // ─── Multi-city comparison ────────────────────────────────────────────────────
