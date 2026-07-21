@@ -16,6 +16,7 @@ import { pm25ToAqi, getAqiCategory } from "@/lib/colors";
 import { useCitizenWard } from "@/hooks/useReports";
 import { useWardLocator } from "@/hooks/useWardLocator";
 import { useCity } from "@/lib/CityContext";
+import { icon, MapPin, Search, ArrowLeft, TriangleAlert } from "@/components/Icon";
 import type { FusionResponse } from "@/lib/types";
 
 const CitizenMap = dynamic(() => import("@/components/citizen/CitizenMap"), {
@@ -112,10 +113,10 @@ export default function CitizenHomePage() {
   }, [cells]);
 
   return (
-    <div className="page-pad" style={{ padding: "var(--space-xl)", maxWidth: 720, margin: "0 auto", width: "100%" }}>
+    <div className="page" style={{ maxWidth: 720 }}>
       <div style={{ textAlign: "center", marginBottom: "var(--space-lg)" }}>
-        <h1 style={{ marginBottom: 8 }}>Your air, your ward</h1>
-        <p style={{ color: "var(--text-secondary)" }}>
+        <h1 style={{ marginBottom: 6 }}>Your air, your ward</h1>
+        <p>
           Find your area to see live air quality, a 72-hour forecast, and to report pollution.
         </p>
       </div>
@@ -123,25 +124,26 @@ export default function CitizenHomePage() {
       {/* Live city AQI band — substance before you even pick a ward */}
       {cityCat && (
         <div
-          className="card"
+          className="card card-rail"
           style={{
+            ["--rail" as string]: cityCat.color,
             display: "flex", alignItems: "center", gap: "var(--space-md)",
-            marginBottom: "var(--space-md)", padding: "var(--space-md) var(--space-lg)",
-            borderLeft: `4px solid ${cityCat.color}`,
-            background: `${cityCat.color}0d`,
+            marginBottom: "var(--space-md)", padding: "var(--space-md)",
           }}
         >
+          {/* The AQI badge was a circle with a 24px coloured glow around it —
+              a glow is a light source, and nothing here emits light. A flat
+              tile with the band colour reads as a measurement instead. */}
           <div style={{
-            width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
+            width: 50, height: 50, borderRadius: "var(--radius-md)", flexShrink: 0,
             background: cityCat.color, color: cityCat.textColor,
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 0 24px ${cityCat.color}55`,
           }}>
-            <div style={{ fontSize: "1.15rem", fontWeight: 700, lineHeight: 1 }}>{cityAqi}</div>
-            <div style={{ fontSize: "0.5rem", opacity: 0.85 }}>AQI</div>
+            <div className="mono" style={{ fontSize: "1.1rem", fontWeight: 600, lineHeight: 1 }}>{cityAqi}</div>
+            <div style={{ fontSize: "0.5rem", opacity: 0.8, letterSpacing: "0.08em", marginTop: 2 }}>AQI</div>
           </div>
           <div>
-            <div style={{ fontSize: "1.05rem", fontWeight: 600, color: "var(--text-primary)" }}>
+            <div style={{ fontSize: "0.975rem", fontWeight: 550, color: "var(--text-primary)" }}>
               Citywide air is {cityCat.label}
             </div>
             <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
@@ -155,63 +157,66 @@ export default function CitizenHomePage() {
         <button
           className="btn btn-primary"
           onClick={() => router.push(`/citizen/${savedWard}`)}
-          style={{ width: "100%", justifyContent: "center", marginBottom: "var(--space-md)" }}
+          style={{ width: "100%", marginBottom: "var(--space-md)" }}
         >
-          ↩ Back to my ward
+          <ArrowLeft {...icon.md} aria-hidden />
+          Back to my ward
         </button>
       )}
 
       {/* Primary action: geolocate */}
+      {/* The page's primary action, and the only filled button on it. */}
       <button
-        className="btn btn-emerald"
+        className="btn btn-primary"
         onClick={useMyLocation}
         disabled={locating || !hasData}
-        style={{ width: "100%", justifyContent: "center", marginBottom: "var(--space-sm)", padding: "var(--space-md)" }}
+        style={{ width: "100%", marginBottom: "var(--space-sm)", padding: "11px" }}
       >
-        {locating ? "Locating…" : "📍 Use my location"}
+        <MapPin {...icon.md} aria-hidden />
+        {locating ? "Locating…" : "Use my location"}
       </button>
       {geoError && (
-        <p style={{ fontSize: "0.8rem", color: "var(--accent-amber)", textAlign: "center", marginBottom: "var(--space-sm)" }}>
-          {geoError}
-        </p>
+        <div role="alert" className="alert alert-caution" style={{ marginBottom: "var(--space-sm)" }}>
+          <TriangleAlert {...icon.md} aria-hidden />
+          <div className="alert-body">{geoError}</div>
+        </div>
       )}
 
       {/* Search by ward name — always visible, live-matching */}
       <div style={{ position: "relative", marginBottom: "var(--space-sm)" }}>
-        <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-tertiary)", pointerEvents: "none" }}>
-          🔍
-        </span>
+        <Search
+          {...icon.md}
+          aria-hidden
+          style={{
+            position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)",
+            color: "var(--text-tertiary)", pointerEvents: "none",
+          }}
+        />
         <input
           type="search"
+          aria-label="Search your ward by name"
           placeholder="Search your ward by name…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ paddingLeft: 38, width: "100%" }}
+          style={{ paddingLeft: 34, width: "100%" }}
         />
         {searchHits.length > 0 && (
           <div
-            className="card"
-            style={{
-              position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
-              zIndex: "var(--z-panel)", padding: 4, maxHeight: 280, overflowY: "auto",
-              boxShadow: "var(--shadow-lg)",
-            }}
+            role="listbox"
+            aria-label="Matching wards"
+            className="menu"
+            style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0 }}
           >
             {searchHits.map((w) => (
               <button
                 key={w.ward_id}
+                role="option"
+                aria-selected={false}
+                className="menu-item"
                 onClick={() => go(w.ward_id)}
-                style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  width: "100%", padding: "9px 12px", borderRadius: "var(--radius-sm)",
-                  border: "none", background: "transparent", cursor: "pointer", textAlign: "left",
-                  color: "var(--text-primary)", fontSize: "0.88rem",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-hover)")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
               >
-                <span>{w.ward_name}</span>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "var(--text-tertiary)" }}>{w.ward_id}</span>
+                <span className="truncate">{w.ward_name}</span>
+                <span className="menu-meta mono">{w.ward_id}</span>
               </button>
             ))}
           </div>
@@ -228,7 +233,7 @@ export default function CitizenHomePage() {
       {/* Worst wards right now — live, tappable, fills the space with substance */}
       {worstWards.length > 0 && (
         <div style={{ marginTop: "var(--space-lg)" }}>
-          <div style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: "var(--space-sm)" }}>
+          <div className="section-label" style={{ marginBottom: "var(--space-sm)" }}>
             Worst air right now
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "var(--space-sm)" }}>
@@ -243,14 +248,14 @@ export default function CitizenHomePage() {
                   className="card card-hover"
                   style={{
                     display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                    cursor: "pointer", textAlign: "left", borderLeft: `3px solid ${cat.color}`,
+                    cursor: "pointer", textAlign: "left", fontFamily: "inherit",
                   }}
                 >
-                  <div style={{
-                    minWidth: 40, height: 40, borderRadius: "var(--radius-sm)", flexShrink: 0,
+                  <div className="mono" style={{
+                    minWidth: 38, height: 38, borderRadius: "var(--radius-sm)", flexShrink: 0,
                     background: cat.color, color: cat.textColor,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontWeight: 700, fontSize: "0.95rem",
+                    fontWeight: 600, fontSize: "0.9rem",
                   }}>
                     {aqi}
                   </div>

@@ -10,6 +10,7 @@ import { AQI_ADVICE } from "@/lib/constants";
 import type { FusionResponse, ForecastCell } from "@/lib/types";
 
 import VoiceAdvisory from "@/components/citizen/VoiceAdvisory";
+import { icon, ArrowLeft, ArrowRight, Camera, ClipboardList, Megaphone, TrendingUp } from "@/components/Icon";
 
 const CitizenMap = dynamic(() => import("@/components/citizen/CitizenMap"), {
   ssr: false,
@@ -67,30 +68,22 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
   const adviceIndex = category ? Math.max(0, AQI_CATEGORIES.indexOf(category)) : 0;
 
   return (
-    <div className="page-pad" style={{ padding: "var(--space-xl)", maxWidth: 680, margin: "0 auto", width: "100%" }}>
-      {/* Back */}
-      <Link
-        href="/citizen"
-        style={{
-          display: "inline-flex", alignItems: "center", gap: 6,
-          color: "var(--text-tertiary)", textDecoration: "none",
-          fontSize: "0.8rem", marginBottom: "var(--space-lg)",
-          transition: "color var(--transition-fast)",
-        }}
-      >
-        ← Change ward
+    <div className="page" style={{ maxWidth: 680 }}>
+      <Link href="/citizen" className="nav-link" style={{ marginBottom: "var(--space-md)", marginLeft: -10 }}>
+        <ArrowLeft {...icon.sm} aria-hidden />
+        Change ward
       </Link>
 
       {/* Ward name */}
       <div style={{ marginBottom: "var(--space-md)" }}>
-        <h1 style={{ marginBottom: 4 }}>
+        <h1 style={{ marginBottom: 3 }}>
           {isLoading ? (
             <span className="skeleton" style={{ display: "inline-block", width: 200, height: 32, borderRadius: 6 }} />
           ) : (
             summary?.ward_name ?? wardId
           )}
         </h1>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", color: "var(--text-tertiary)" }}>
+        <span className="mono" style={{ fontSize: "0.78rem", color: "var(--text-tertiary)" }}>
           {wardId}
         </span>
       </div>
@@ -105,32 +98,36 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
 
       {/* AQI Card */}
       <div
-        className="card"
+        className="card card-rail"
         style={{
           marginBottom: "var(--space-lg)",
-          borderColor: category ? category.color + "40" : undefined,
-          background: category ? category.color + "08" : undefined,
+          ["--rail" as string]: category?.color ?? "var(--border-strong)",
+          padding: "var(--space-lg)",
         }}
       >
         {isLoading ? (
           <div className="skeleton" style={{ height: 120, borderRadius: 8 }} />
         ) : (
           <div style={{ display: "flex", gap: "var(--space-xl)", alignItems: "center" }}>
-            {/* AQI dial */}
-            <div style={{ textAlign: "center", flexShrink: 0 }}>
+            {/* AQI reading. A 100px glowing disc read as a game score; a
+                square swatch reads as a measurement, and matches the band
+                swatches in the map legend. */}
+            <div style={{ flexShrink: 0 }}>
               <div
                 style={{
-                  width: 100, height: 100, borderRadius: "50%",
-                  background: category?.color ?? "#666",
+                  width: 86, height: 86, borderRadius: "var(--radius-lg)",
+                  background: category?.color ?? "var(--bg-tertiary)",
                   display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center",
-                  boxShadow: `0 0 30px ${category?.color ?? "#666"}40`,
                 }}
               >
-                <div style={{ fontSize: "1.8rem", fontWeight: 700, color: category?.textColor ?? "#fff", lineHeight: 1 }}>
+                <div
+                  className="mono"
+                  style={{ fontSize: "1.7rem", fontWeight: 600, color: category?.textColor ?? "var(--text-secondary)", lineHeight: 1 }}
+                >
                   {aqi ?? "—"}
                 </div>
-                <div style={{ fontSize: "0.6rem", color: category?.textColor ?? "#fff", opacity: 0.85, marginTop: 2 }}>
+                <div style={{ fontSize: "0.58rem", color: category?.textColor ?? "var(--text-tertiary)", opacity: 0.8, marginTop: 3, letterSpacing: "0.1em" }}>
                   AQI
                 </div>
               </div>
@@ -138,22 +135,29 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
             {/* Details */}
             <div style={{ flex: 1 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: "1.2rem", fontWeight: 600 }}>{category?.label ?? "No data"}</span>
+                <span style={{ fontSize: "1.1rem", fontWeight: 600 }}>{category?.label ?? "No data"}</span>
                 {(() => {
                   const now = forecast[0].aqi, next = forecast[1].aqi;
                   if (now == null || next == null) return null;
                   const d = next - now;
-                  if (Math.abs(d) < 3) return <span style={{ fontSize: "0.72rem", color: "var(--text-tertiary)" }}>→ steady</span>;
+                  if (Math.abs(d) < 3) {
+                    return <span className="badge badge-diffuse">steady · 24h</span>;
+                  }
                   const worse = d > 0;
                   return (
-                    <span style={{ fontSize: "0.72rem", fontWeight: 600, color: worse ? "var(--accent-red)" : "var(--accent-emerald)" }}>
-                      {worse ? "↑" : "↓"} {worse ? "worsening" : "improving"} (24h)
+                    <span className={`badge ${worse ? "badge-critical" : "badge-positive"}`}>
+                      <TrendingUp
+                        {...icon.sm}
+                        aria-hidden
+                        style={{ transform: worse ? "none" : "scaleY(-1)" }}
+                      />
+                      {worse ? "worsening" : "improving"} · 24h
                     </span>
                   );
                 })()}
               </div>
               <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)", marginBottom: 8 }}>
-                PM2.5: <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-primary)" }}>
+                PM2.5 <span className="mono" style={{ color: "var(--text-primary)" }}>
                   {summary?.pm25 != null ? `${summary.pm25.toFixed(1)} µg/m³` : "—"}
                 </span>
               </div>
@@ -168,15 +172,14 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
       {/* Advisory */}
       {advisoryText && (
         <div
-          className="card"
-          style={{
-            marginBottom: "var(--space-lg)",
-            borderColor: "rgba(245,158,11,0.3)",
-            background: "rgba(245,158,11,0.05)",
-          }}
+          className="card card-rail"
+          style={{ marginBottom: "var(--space-lg)", ["--rail" as string]: "var(--caution)" }}
         >
-          <h5 style={{ marginBottom: 8, color: "var(--accent-amber)" }}>📢 Advisory</h5>
-          <p style={{ fontSize: "0.9rem", color: "var(--text-primary)", lineHeight: 1.6 }}>
+          <h5 style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <Megaphone {...icon.sm} aria-hidden />
+            Advisory
+          </h5>
+          <p style={{ fontSize: "0.875rem", color: "var(--text-primary)", lineHeight: 1.6 }}>
             {advisoryText}
           </p>
         </div>
@@ -187,7 +190,7 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
 
       {/* 72-hour forecast — median predicted AQI across the ward's cells */}
       <div className="card" style={{ marginBottom: "var(--space-lg)" }}>
-        <h5 style={{ marginBottom: "var(--space-md)" }}>72-Hour Forecast</h5>
+        <h5 style={{ marginBottom: "var(--space-md)" }}>72-hour forecast</h5>
         <div style={{ display: "flex", gap: "var(--space-sm)" }}>
           {forecast.map((f) => {
             const cat = f.aqi != null ? getAqiCategory(f.aqi) : null;
@@ -195,17 +198,17 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
               <div
                 key={f.label}
                 style={{
-                  flex: 1, textAlign: "center", padding: "var(--space-md) 4px",
+                  flex: 1, textAlign: "center", padding: "12px 4px",
                   borderRadius: "var(--radius-md)",
-                  background: cat ? cat.color + "12" : "var(--bg-secondary)",
-                  border: `1px solid ${cat ? cat.color + "30" : "var(--border-subtle)"}`,
+                  background: "var(--bg-tertiary)",
+                  borderTop: `2px solid ${cat ? cat.color : "var(--border-default)"}`,
                 }}
               >
                 <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginBottom: 6 }}>{f.label}</div>
-                <div style={{ fontSize: "1.5rem", fontWeight: 700, color: cat?.color ?? "var(--text-tertiary)", lineHeight: 1 }}>
+                <div className="mono" style={{ fontSize: "1.35rem", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1 }}>
                   {f.aqi ?? "—"}
                 </div>
-                <div style={{ fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: 4 }}>{cat?.label ?? ""}</div>
+                <div style={{ fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: 5 }}>{cat?.label ?? ""}</div>
               </div>
             );
           })}
@@ -217,16 +220,19 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
         <Link
           href={`/citizen/${wardId}/report`}
           className="btn btn-primary"
-          style={{ flex: 1, justifyContent: "center", textDecoration: "none" }}
+          style={{ flex: 1, textDecoration: "none" }}
         >
-          📸 Report Pollution
+          <Camera {...icon.md} aria-hidden />
+          Report pollution
         </Link>
         <Link
           href="/citizen/reports"
           className="btn btn-ghost"
-          style={{ flex: 1, justifyContent: "center", textDecoration: "none" }}
+          style={{ flex: 1, textDecoration: "none" }}
         >
-          📋 My Reports
+          <ClipboardList {...icon.md} aria-hidden />
+          My reports
+          <ArrowRight {...icon.sm} aria-hidden />
         </Link>
       </div>
     </div>

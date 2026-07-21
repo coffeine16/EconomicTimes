@@ -14,6 +14,7 @@
  * is which, per language.
  */
 import { useEffect, useState } from "react";
+import { icon, Volume2, TriangleAlert } from "@/components/Icon";
 
 const LANG_NAME: Record<string, string> = {
   en: "English", hi: "हिन्दी", ta: "தமிழ்", kn: "ಕನ್ನಡ",
@@ -62,21 +63,19 @@ export default function VoiceAdvisory({ city, wardId }: { city: string; wardId: 
   return (
     <div className="card" style={{ marginBottom: "var(--space-lg)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: "var(--space-sm)" }}>
-        <h5 style={{ margin: 0 }}>🔊 Listen to this advisory</h5>
+        <h5 style={{ display: "flex", alignItems: "center", gap: 6, margin: 0 }}>
+          <Volume2 {...icon.sm} aria-hidden />
+          Listen to this advisory
+        </h5>
         {entries.length > 1 && (
           <div style={{ display: "flex", gap: 4 }}>
             {entries.map((e) => (
               <button
                 key={e.lang}
+                className="chip"
+                data-active={e.lang === lang}
+                aria-pressed={e.lang === lang}
                 onClick={() => setLang(e.lang)}
-                style={{
-                  padding: "4px 10px", borderRadius: "var(--radius-full)",
-                  border: `1px solid ${e.lang === lang ? "var(--accent-blue)" : "var(--border-default)"}`,
-                  background: e.lang === lang ? "var(--accent-blue)" : "transparent",
-                  color: e.lang === lang ? "#fff" : "var(--text-secondary)",
-                  fontSize: "0.75rem", fontWeight: 600, cursor: "pointer",
-                  transition: "all var(--transition-fast)",
-                }}
               >
                 {LANG_NAME[e.lang] ?? e.lang}
               </button>
@@ -95,12 +94,16 @@ export default function VoiceAdvisory({ city, wardId }: { city: string; wardId: 
         Your browser cannot play audio.
       </audio>
 
-      <div style={{
-        marginTop: 8, fontSize: "0.72rem", lineHeight: 1.5,
-        color: isNative ? "var(--text-tertiary)" : "var(--accent-amber)",
-      }}>
-        {!isNative && "⚠ "}{note}
-      </div>
+      {isNative ? (
+        <div style={{ marginTop: 9, fontSize: "0.72rem", lineHeight: 1.5, color: "var(--text-tertiary)" }}>
+          {note}
+        </div>
+      ) : (
+        <div className="alert alert-caution" style={{ marginTop: 9, fontSize: "0.72rem" }}>
+          <TriangleAlert {...icon.sm} aria-hidden />
+          <div className="alert-body">{note}</div>
+        </div>
+      )}
     </div>
   );
 }
