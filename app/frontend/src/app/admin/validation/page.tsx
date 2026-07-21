@@ -39,8 +39,8 @@ const j = async <T,>(u: string, fb: T): Promise<T> => {
 function Section({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
     <section style={{ marginBottom: "var(--space-2xl)" }}>
-      <h2 style={{ marginBottom: 4 }}>{title}</h2>
-      {sub && <p style={{ fontSize: "0.85rem", marginBottom: "var(--space-md)", maxWidth: 760 }}>{sub}</p>}
+      <h2 style={{ marginBottom: 5 }}>{title}</h2>
+      {sub && <p style={{ fontSize: "0.85rem", marginBottom: "var(--space-md)", maxWidth: "72ch" }}>{sub}</p>}
       {children}
     </section>
   );
@@ -61,10 +61,10 @@ export default function ValidationPage() {
   });
 
   return (
-    <div className="page-pad" style={{ padding: "var(--space-xl)", maxWidth: 1000, margin: "0 auto" }}>
-      <div style={{ marginBottom: "var(--space-xl)" }}>
-        <h1 style={{ marginBottom: 8 }}>Validation</h1>
-        <p style={{ maxWidth: 760 }}>
+    <div className="page" style={{ maxWidth: 1000, overflowY: "auto", height: "100%" }}>
+      <div className="page-head">
+        <h1>Validation</h1>
+        <p>
           What we measured — <strong>including what does not work</strong>. Every number here
           comes from a script you can run. A validation page that only showed wins would be
           marketing, not validation.
@@ -78,23 +78,23 @@ export default function ValidationPage() {
       >
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           <div className="scroll-x">
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 480 }}>
+            <table className="data-table" style={{ minWidth: 480 }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
-                  <th style={th}>Horizon</th>
-                  {CITIES.map((c) => <th key={c.id} style={{ ...th, textAlign: "right" }}>{c.label}</th>)}
+                <tr>
+                  <th>Horizon</th>
+                  {CITIES.map((c) => <th key={c.id} style={{ textAlign: "right" }}>{c.label}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {(["h24", "h48", "h72"] as const).map((h) => (
-                  <tr key={h} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                    <td style={td}>{h.replace("h", "+")}h</td>
+                  <tr key={h}>
+                    <td style={{ color: "var(--text-primary)" }}>{h.replace("h", "+")}h</td>
                     {CITIES.map((c) => {
                       const s = fe?.[c.id]?.[h]?.skill_vs_persistence_pct;
                       const good = (s ?? 0) > 0;
                       return (
-                        <td key={c.id} style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)", fontWeight: 600,
-                          color: s == null ? "var(--text-tertiary)" : good ? "var(--accent-emerald)" : "var(--accent-amber)" }}>
+                        <td key={c.id} className="num" style={{ fontWeight: 550,
+                          color: s == null ? "var(--text-tertiary)" : good ? "var(--positive)" : "var(--caution)" }}>
                           {s == null ? "—" : `${s > 0 ? "+" : ""}${s.toFixed(1)}%`}
                         </td>
                       );
@@ -118,13 +118,15 @@ export default function ValidationPage() {
         title="Fusion exposure field — claim withdrawn"
         sub="We claimed this cut error ~36% vs a naive station-mean. On real cities it does not. We report it rather than quietly dropping it."
       >
-        <div className="card" style={{ borderLeft: "3px solid var(--accent-amber)" }}>
+        <div className="card card-rail" style={{ ["--rail" as string]: "var(--caution)" }}>
           <div className="scroll-x">
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
+            <table className="data-table" style={{ minWidth: 460 }}>
               <thead>
-                <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
-                  <th style={th}>City</th><th style={{ ...th, textAlign: "right" }}>Model RMSE</th>
-                  <th style={{ ...th, textAlign: "right" }}>Naive city-mean</th><th style={{ ...th, textAlign: "right" }}>Verdict</th>
+                <tr>
+                  <th>City</th>
+                  <th style={{ textAlign: "right" }}>Model RMSE</th>
+                  <th style={{ textAlign: "right" }}>Naive city-mean</th>
+                  <th style={{ textAlign: "right" }}>Verdict</th>
                 </tr>
               </thead>
               <tbody>
@@ -132,12 +134,16 @@ export default function ValidationPage() {
                   const o = lo?.[c.id]?.overall;
                   const worse = o ? o.rmse > o.naive_citymean_rmse : false;
                   return (
-                    <tr key={c.id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-                      <td style={td}>{c.label}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)" }}>{o ? o.rmse.toFixed(1) : "—"}</td>
-                      <td style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)" }}>{o ? o.naive_citymean_rmse.toFixed(1) : "—"}</td>
-                      <td style={{ ...td, textAlign: "right", fontWeight: 600, color: worse ? "var(--accent-red)" : "var(--accent-emerald)" }}>
-                        {o ? (worse ? "worse than naive" : "beats naive") : "—"}
+                    <tr key={c.id}>
+                      <td style={{ color: "var(--text-primary)" }}>{c.label}</td>
+                      <td className="num">{o ? o.rmse.toFixed(1) : "—"}</td>
+                      <td className="num">{o ? o.naive_citymean_rmse.toFixed(1) : "—"}</td>
+                      <td style={{ textAlign: "right" }}>
+                        {o
+                          ? <span className={`badge ${worse ? "badge-critical" : "badge-positive"}`}>
+                              {worse ? "worse than naive" : "beats naive"}
+                            </span>
+                          : "—"}
                       </td>
                     </tr>
                   );
@@ -166,11 +172,15 @@ export default function ValidationPage() {
             {v.detection.tiers.map((t) => {
               const hit = t.found > 0;
               return (
-                <div key={t.tier} className="card" style={{ borderLeft: `3px solid ${hit ? "var(--accent-emerald)" : "var(--accent-red)"}` }}>
+                <div
+                  key={t.tier}
+                  className="card card-rail"
+                  style={{ ["--rail" as string]: hit ? "var(--positive)" : "var(--critical)" }}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
-                    <strong style={{ fontSize: "0.9rem" }}>{t.tier}</strong>
-                    <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: "1.05rem",
-                      color: hit ? "var(--accent-emerald)" : "var(--accent-red)" }}>
+                    <strong style={{ fontSize: "0.885rem" }}>{t.tier}</strong>
+                    <span className="mono" style={{ fontWeight: 600, fontSize: "1.05rem",
+                      color: hit ? "var(--positive)" : "var(--critical)" }}>
                       {t.found}/{t.total}
                     </span>
                   </div>
@@ -181,7 +191,7 @@ export default function ValidationPage() {
             })}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--space-md)", marginTop: "var(--space-md)" }}>
+          <div className="grid-auto" style={{ marginTop: "var(--space-md)" }}>
             <Stat label="Enforceable-zone precision" value={`${v.detection.zone_precision.correct}/${v.detection.zone_precision.total}`} sub={v.detection.zone_precision.unit} />
             <Stat label="Attribution accuracy" value={`${v.attribution.accuracy.correct}/${v.attribution.accuracy.total}`} sub={v.attribution.unregistered.note} />
             <Stat label="Cell-level precision" value={`${v.detection.cell_precision.correct}/${v.detection.cell_precision.total}`} sub={v.detection.cell_precision.note} />
@@ -194,7 +204,7 @@ export default function ValidationPage() {
         <Section title="What these numbers do NOT mean" sub="Every claim above, qualified by us before anyone else has to.">
           <div style={{ display: "grid", gap: "var(--space-sm)" }}>
             {v.caveats.map((c, i) => (
-              <div key={i} className="card" style={{ borderLeft: "3px solid var(--accent-amber)", fontSize: "0.85rem", lineHeight: 1.55, color: "var(--text-secondary)" }}>
+              <div key={i} className="card card-rail" style={{ ["--rail" as string]: "var(--caution)", fontSize: "0.84rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
                 {c}
               </div>
             ))}
@@ -215,18 +225,10 @@ export default function ValidationPage() {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
-    <div className="card">
-      <div style={{ fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-tertiary)", fontWeight: 700 }}>{label}</div>
-      <div style={{ fontSize: "1.8rem", fontWeight: 700, color: "var(--accent-blue)", lineHeight: 1.1, margin: "4px 0" }}>{value}</div>
-      <div style={{ fontSize: "0.72rem", color: "var(--text-tertiary)", lineHeight: 1.45 }}>{sub}</div>
+    <div className="stat">
+      <div className="section-label">{label}</div>
+      <div className="stat-value mono">{value}</div>
+      <div className="stat-sub">{sub}</div>
     </div>
   );
 }
-
-const th: React.CSSProperties = {
-  padding: "10px 14px", textAlign: "left", fontSize: "0.7rem", fontWeight: 700,
-  color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
-};
-const td: React.CSSProperties = {
-  padding: "10px 14px", fontSize: "0.85rem", color: "var(--text-secondary)", whiteSpace: "nowrap",
-};

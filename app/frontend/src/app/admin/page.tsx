@@ -4,7 +4,7 @@
  * Full-bleed map (left ~70%) + collapsible Action Queue panel (right ~30%)
  */
 import dynamic from "next/dynamic";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import useSWR, { mutate } from "swr";
 
 import { api } from "@/lib/api";
@@ -12,7 +12,10 @@ import { useCity } from "@/lib/CityContext";
 import { useFilters }  from "@/hooks/useFilters";
 import { filterHotspots } from "@/hooks/useHotspots";
 import { useAgentRun } from "@/hooks/useAgentRun";
-import { useIsMobile } from "@/hooks/useMediaQuery";
+import { useToast } from "@/components/Toast";
+import { AGENT_LABELS } from "@/lib/constants";
+import { useIsMobile, useIsCompact } from "@/hooks/useMediaQuery";
+import { icon, Zap, LoaderCircle, SlidersHorizontal, X, Hexagon, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "@/components/Icon";
 
 // All WebGL/heavy components are dynamically imported — no SSR
 const MapContainer    = dynamic(() => import("@/components/map/MapContainer"),                { ssr: false, loading: () => <MapPlaceholder /> });
@@ -28,9 +31,9 @@ function MapPlaceholder() {
       width: "100%", height: "100%",
       background: "var(--bg-secondary)",
       display: "flex", alignItems: "center", justifyContent: "center",
-      color: "var(--text-tertiary)", fontSize: "0.9rem",
+      color: "var(--text-tertiary)", fontSize: "0.85rem", gap: 8,
     }}>
-      <span style={{ marginRight: 8, fontSize: "1.2rem" }}>⬡</span>
+      <Hexagon {...icon.md} className="animate-breathe" aria-hidden />
       Loading map…
     </div>
   );
@@ -38,7 +41,18 @@ function MapPlaceholder() {
 
 export default function AdminPage() {
   const isMobile = useIsMobile();
-  const [panelOpen, setPanelOpen]   = useState(true);
+  // LAYOUT keys off compact (≤1024), not phone (≤768): a tablet cannot carry a
+  // full-bleed map AND a 372px queue AND a floating control rail side by side.
+  // CONTENT still keys off isMobile where a phone genuinely needs different
+  // copy or sizing. See hooks/useMediaQuery.ts.
+  const isCompact = useIsCompact();
+  // `null` = the user has not chosen yet, so fall back to the layout default:
+  // open on desktop (it is a side panel, it costs the map nothing) and closed
+  // on compact (it is an overlay — landing on a map with 72% of it covered,
+  // before you have looked at the map, is backwards). Resolved at RENDER time
+  // rather than by an effect, because isCompact only becomes true after mount
+  // and syncing it with setState would cascade a re-render on every load.
+  const [panelPref, setPanelPref] = useState<boolean | null>(null);
   const [hourOffset, setHourOffset] = useState(0);
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [mobileControls, setMobileControls] = useState(false);
@@ -98,6 +112,41 @@ export default function AdminPage() {
   }, [city]);
   const { agents, running, runAgent, resetAgents } = useAgentRun(onAgentComplete);
 
+  // A pipeline run is slow, started deliberately, and finishes while you are
+  // usually looking at the map with the drawer shut. `useAgentRun` has always
+  // exposed the outcome; until now nothing rendered it, so a failed run was
+  // silent. Report it once per run, at the moment it settles.
+  const toast = useToast();
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      const failed = agents.filter((a) => a.status === "error");
+      const done = agents.filter((a) => a.status === "done");
+      if (failed.length) {
+        toast({
+          tone: "critical",
+          title: `${failed.length} agent${failed.length > 1 ? "s" : ""} failed`,
+          body: `${failed.map((a) => AGENT_LABELS[a.name]).join(", ")}. The map still shows the last good batch output.`,
+        });
+      } else if (done.length) {
+        toast({
+          tone: "positive",
+          title: `Pipeline complete · ${done.length} agent${done.length > 1 ? "s" : ""}`,
+          body: "Hotspots, fusion, dispatch and audit have been refreshed.",
+        });
+      }
+    }
+    wasRunning.current = running;
+  }, [running, agents, toast]);
+
+  const panelOpen = panelPref ?? !isCompact;
+  const togglePanel = () => setPanelPref(!panelOpen);
+
+  // On compact the sheet and the floating map controls fight for the same
+  // bottom strip. When the sheet is open the user is reading the queue, so the
+  // controls step aside rather than stacking three deep on top of it.
+  const showMapControls = !(isCompact && panelOpen);
+
   return (
     <div style={{ display: "flex", height: "100%", overflow: "hidden" }}>
 
@@ -116,32 +165,43 @@ export default function AdminPage() {
             onClick={() => setPipelineOpen(true)}
             style={{ boxShadow: "var(--shadow-md)" }}
           >
-            {running
-              ? <><span className="animate-spin" style={{ display: "inline-block" }}>⬡</span> Pipeline {agents.filter((a) => a.status === "done").length}/9</>
-              : <>⚡ Agent Pipeline</>}
+            {running ? (
+              <>
+                <LoaderCircle {...icon.sm} className="animate-spin" aria-hidden />
+                Pipeline {agents.filter((a) => a.status === "done").length}/9
+              </>
+            ) : (
+              <>
+                <Zap {...icon.sm} aria-hidden />
+                Agent pipeline
+              </>
+            )}
           </button>
-          {isMobile && (
+          {isCompact && (
             <button
               className="btn btn-ghost btn-sm glass"
               onClick={() => setMobileControls((s) => !s)}
+              aria-expanded={mobileControls}
             >
-              {mobileControls ? "✕ Close layers" : "☰ Layers & filters"}
+              {mobileControls
+                ? <><X {...icon.sm} aria-hidden /> Close</>
+                : <><SlidersHorizontal {...icon.sm} aria-hidden /> Layers &amp; filters</>}
             </button>
           )}
         </div>
 
         {/* Layer/filter controls. Desktop: always-visible left rail below the
-            Pipeline button. Mobile: toggled open. */}
-        {(!isMobile || mobileControls) && (
+            Pipeline button. Compact: toggled open over the map. */}
+        {(!isCompact || mobileControls) && (
           <div style={{
             position: "absolute",
-            top: isMobile ? 96 : 56, left: 12,
+            top: isCompact ? 92 : 56, left: 12,
             zIndex: "var(--z-overlay)",
             display: "flex", flexDirection: "column",
             gap: "var(--space-sm)",
-            maxWidth: isMobile ? "calc(100vw - 24px)" : 188,
-            maxHeight: isMobile ? "56vh" : undefined,
-            overflowY: isMobile ? "auto" : undefined,
+            maxWidth: isCompact ? "min(280px, calc(100vw - 24px))" : 188,
+            maxHeight: isCompact ? "60vh" : undefined,
+            overflowY: isCompact ? "auto" : undefined,
           }}>
             <LayerToggle layers={layers} onToggle={toggleLayer} />
             <FilterBar
@@ -154,16 +214,21 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Time slider — centered at bottom, lifted above the mobile sheet handle */}
-        <div style={{
-          position: "absolute",
-          bottom: isMobile ? 80 : 24, left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: "var(--z-overlay)",
-          width: isMobile ? "92%" : "min(480px, 80%)",
-        }}>
-          <TimeSlider value={hourOffset} onChange={setHourOffset} />
-        </div>
+        {/* Forecast horizon — centred at the bottom, clearing the collapsed
+            sheet handle (44px) on compact. Hidden entirely while the sheet is
+            open: it would sit *under* an opaque panel and be untappable. */}
+        {showMapControls && (
+          <div style={{
+            position: "absolute",
+            bottom: isCompact ? 56 : 24, left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: "var(--z-overlay)",
+            width: isCompact ? "calc(100% - 24px)" : "min(480px, 80%)",
+            transition: "bottom var(--transition-normal)",
+          }}>
+            <TimeSlider value={hourOffset} onChange={setHourOffset} />
+          </div>
+        )}
 
         {/* The full-bleed map */}
         <MapContainer
@@ -181,16 +246,17 @@ export default function AdminPage() {
           selectedCell={selectedCell}
           onCellClick={setSelectedCell}
           recenterKey={city}
+          showOverlays={showMapControls}
         />
       </div>
 
-      {/* ── Action Queue — right panel (desktop) / bottom sheet (mobile) ──────── */}
-      {isMobile ? (
+      {/* ── Action Queue — right panel (desktop) / bottom sheet (compact) ────── */}
+      {isCompact ? (
         // SOLID, not glass — a content panel over a busy map must not let the
         // map (or the legend) bleed through its text.
         <div style={{
           position: "fixed", left: 0, right: 0, bottom: 0,
-          height: panelOpen ? "62vh" : 44,
+          height: panelOpen ? (isMobile ? "72vh" : "62vh") : 44,
           transition: "height var(--transition-slow)",
           background: "var(--bg-primary)",
           borderTop: "1px solid var(--border-default)",
@@ -201,16 +267,21 @@ export default function AdminPage() {
         }}>
           {/* Drag handle / toggle */}
           <button
-            onClick={() => setPanelOpen((p) => !p)}
+            onClick={togglePanel}
+            aria-expanded={panelOpen}
             style={{
               height: 44, flexShrink: 0, border: "none", background: "transparent",
               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
               gap: 4, cursor: "pointer", color: "var(--text-secondary)",
             }}
           >
-            <span style={{ width: 36, height: 4, borderRadius: 2, background: "var(--border-strong)" }} />
-            <span style={{ fontSize: "0.72rem", fontWeight: 600 }}>
-              {panelOpen ? "▾ Hide" : `▴ Action Queue (${hotspots.length ? "view" : "…"})`}
+            <span aria-hidden style={{ width: 32, height: 3, borderRadius: 2, background: "var(--border-strong)" }} />
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: "0.72rem", fontWeight: 550 }}>
+              {panelOpen ? (
+                <><ChevronDown {...icon.sm} aria-hidden /> Hide</>
+              ) : (
+                <><ChevronUp {...icon.sm} aria-hidden /> Action queue</>
+              )}
             </span>
           </button>
           {panelOpen && (
@@ -226,9 +297,9 @@ export default function AdminPage() {
         </div>
       ) : (
         <div style={{
-          width: panelOpen ? 360 : 0,
-          minWidth: panelOpen ? 320 : 0,
-          maxWidth: 420,
+          width: panelOpen ? 372 : 0,
+          minWidth: panelOpen ? 330 : 0,
+          maxWidth: 430,
           overflow: "hidden",
           transition: "width var(--transition-slow), min-width var(--transition-slow)",
           background: "var(--bg-primary)",
@@ -238,22 +309,25 @@ export default function AdminPage() {
           position: "relative",
         }}>
           <button
-            onClick={() => setPanelOpen((p) => !p)}
+            onClick={togglePanel}
             className="btn btn-ghost btn-icon"
             style={{
-              position: "absolute", left: -36, top: "50%",
+              position: "absolute", left: -25, top: "50%",
               transform: "translateY(-50%)",
-              width: 28, height: 52,
-              borderRadius: "var(--radius-sm) 0 0 var(--radius-sm)",
+              width: 25, height: 48, minHeight: 0, padding: 0,
+              borderRadius: "var(--radius-md) 0 0 var(--radius-md)",
               background: "var(--bg-secondary)",
-              border: "1px solid var(--border-default)",
+              borderColor: "var(--border-subtle)",
               borderRight: "none",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "0.7rem", zIndex: 1,
+              zIndex: 1,
             }}
             title={panelOpen ? "Collapse panel" : "Expand panel"}
+            aria-expanded={panelOpen}
+            aria-label={panelOpen ? "Collapse action queue" : "Expand action queue"}
           >
-            {panelOpen ? "›" : "‹"}
+            {panelOpen
+              ? <ChevronRight {...icon.sm} aria-hidden />
+              : <ChevronLeft {...icon.sm} aria-hidden />}
           </button>
 
           {panelOpen && (

@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import type { Attribution } from "@/lib/types";
 import { SOURCE_LABELS } from "@/lib/constants";
 import { SOURCE_COLORS } from "@/lib/colors";
+import { icon, FolderOpen } from "@/components/Icon";
 
 // Cluster attribution rows by (ward_id + primary_source) as a stand-in for
 // a proper entity registry (which needs the repeat-offender agent to be built).
@@ -50,55 +51,59 @@ function buildClusters(attributions: Attribution[]): OffenderCluster[] {
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
 }
 
-const TIER_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  advisory: { label: "Advisory",        color: "#3b82f6", icon: "📋" },
-  memo:     { label: "Enforcement Memo", color: "#f59e0b", icon: "⚠️" },
-  chronic:  { label: "Chronic Offender", color: "#ef4444", icon: "🚨" },
+// Escalation is an ORDERED scale — advisory → memo → chronic — so the three
+// tiers get the three semantic tokens in increasing severity, and nothing else.
+// (Previously blue/amber/red raw hexes plus 📋/⚠️/🚨, three emoji at three
+// different optical weights.)
+const TIER_CONFIG: Record<string, { label: string; tint: string; badge: string; range: string }> = {
+  advisory: { label: "Advisory",         tint: "var(--accent)",   badge: "badge-accent",   range: "1–2×" },
+  memo:     { label: "Enforcement memo", tint: "var(--caution)",  badge: "badge-caution",  range: "3–4×" },
+  chronic:  { label: "Chronic offender", tint: "var(--critical)", badge: "badge-critical", range: "5+×" },
 };
 
 function OffenderCard({ cluster }: { cluster: OffenderCluster }) {
   const tier = TIER_CONFIG[cluster.tier];
-  const sourceColor = (SOURCE_COLORS as Record<string, string>)[cluster.source] ?? "#888";
+  const sourceColor = (SOURCE_COLORS as Record<string, string>)[cluster.source] ?? "var(--text-tertiary)";
   return (
-    <div className="card" style={{
-      display: "flex", alignItems: "center",
-      justifyContent: "space-between", gap: "var(--space-md)",
-      borderLeft: `3px solid ${tier.color}`,
-    }}>
+    <div
+      className="card card-rail card-hover"
+      style={{
+        ["--rail" as string]: tier.tint,
+        display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: "var(--space-md)",
+      }}
+    >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <span style={{ fontSize: "1rem" }}>{tier.icon}</span>
-          <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
+          <span
+            aria-hidden
+            style={{ width: 7, height: 7, borderRadius: 2, background: sourceColor, flexShrink: 0 }}
+          />
+          <span style={{ fontWeight: 550, fontSize: "0.875rem", color: "var(--text-primary)" }}>
             {SOURCE_LABELS[cluster.source as keyof typeof SOURCE_LABELS] ?? cluster.source}
           </span>
-          <span style={{
-            padding: "1px 8px", borderRadius: "var(--radius-full)",
-            background: `${tier.color}18`, color: tier.color,
-            border: `1px solid ${tier.color}30`,
-            fontSize: "0.7rem", fontWeight: 700,
-          }}>
-            {tier.label}
-          </span>
+          <span className={`badge ${tier.badge}`}>{tier.label}</span>
         </div>
-        <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 2 }}>
+        <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
           Ward {cluster.ward_id}
         </div>
-        <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
-          Last attributed: {new Date(cluster.last_seen).toLocaleDateString("en-IN")}
+        <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginTop: 2 }}>
+          Last attributed {new Date(cluster.last_seen).toLocaleDateString("en-IN")}
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-        <div style={{
-          fontFamily: "var(--font-mono)", fontSize: "1.6rem", fontWeight: 700,
-          color: cluster.count >= 5 ? "#ef4444" : cluster.count >= 3 ? "#f59e0b" : "var(--text-secondary)",
-          lineHeight: 1,
-        }}>
-          {cluster.count}
+      <div style={{ display: "flex", alignItems: "baseline", gap: "var(--space-lg)", flexShrink: 0 }}>
+        <div style={{ textAlign: "right" }}>
+          <div className="mono" style={{ fontSize: "1.4rem", fontWeight: 600, lineHeight: 1, color: "var(--text-primary)" }}>
+            {cluster.count}
+          </div>
+          <div className="section-label" style={{ fontSize: "0.62rem", marginTop: 3 }}>attributions</div>
         </div>
-        <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)" }}>attributions</div>
-        <div style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)", color: "var(--text-tertiary)" }}>
-          conf: {cluster.max_confidence.toFixed(2)}
+        <div style={{ textAlign: "right" }}>
+          <div className="mono" style={{ fontSize: "0.95rem", fontWeight: 500, lineHeight: 1, color: "var(--text-secondary)" }}>
+            {cluster.max_confidence.toFixed(2)}
+          </div>
+          <div className="section-label" style={{ fontSize: "0.62rem", marginTop: 3 }}>max conf</div>
         </div>
       </div>
     </div>
@@ -118,43 +123,28 @@ export default function RegistryPage() {
   const advisory = clusters.filter((c) => c.tier === "advisory");
 
   return (
-    <div style={{ padding: "var(--space-xl)", maxWidth: 900, margin: "0 auto" }}>
-      <div style={{ marginBottom: "var(--space-xl)" }}>
-        <h1 style={{ marginBottom: 8 }}>Repeat Offender Registry</h1>
-        <p style={{ maxWidth: 640 }}>
-          Entities attributed repeatedly are escalated through tiers.
-          An accumulated case file — every past attribution + evidence chain — is ready for closure proceedings.
+    <div className="page" style={{ maxWidth: 900, overflowY: "auto", height: "100%" }}>
+      <div className="page-head">
+        <h1>Repeat offender registry</h1>
+        <p>
+          Entities attributed repeatedly are escalated through tiers. The accumulated
+          case file — every past attribution and evidence chain — is ready for closure
+          proceedings.
         </p>
-        <div className="card" style={{
-          marginTop: "var(--space-md)", padding: "10px 14px",
-          background: "rgba(245,158,11,0.06)",
-          borderColor: "rgba(245,158,11,0.2)",
-          fontSize: "0.8rem", color: "var(--text-secondary)",
-        }}>
-          ⚠ Currently derived client-side from attribution history.
-          The backend repeat-offender agent (clustering by source location across weeks) is not yet built.
-          Attribution count ≥3 = memo tier; ≥5 = chronic offender flag.
+        <div className="note" style={{ ["--rail" as string]: "var(--caution)", marginTop: "var(--space-md)" }}>
+          Currently derived client-side from attribution history. The backend
+          repeat-offender agent (clustering by source location across weeks) is not
+          yet built. Attribution count ≥ 3 = memo tier; ≥ 5 = chronic offender flag.
         </div>
       </div>
 
-      {/* Escalation legend */}
-      <div style={{
-        display: "flex", gap: "var(--space-md)", marginBottom: "var(--space-xl)", flexWrap: "wrap",
-      }}>
-        {Object.entries(TIER_CONFIG).map(([key, { label, color, icon }]) => (
-          <div key={key} style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "6px 12px",
-            background: `${color}10`,
-            border: `1px solid ${color}25`,
-            borderRadius: "var(--radius-full)",
-            fontSize: "0.8rem", fontWeight: 500, color,
-          }}>
-            {icon} {label}
-            {key === "advisory" && <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(1–2×)</span>}
-            {key === "memo"     && <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(3–4×)</span>}
-            {key === "chronic"  && <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>(5+×)</span>}
-          </div>
+      {/* Escalation scale */}
+      <div style={{ display: "flex", gap: "var(--space-sm)", marginBottom: "var(--space-xl)", flexWrap: "wrap" }}>
+        {Object.entries(TIER_CONFIG).map(([key, { label, badge, range }]) => (
+          <span key={key} className={`badge ${badge}`} style={{ padding: "4px 9px" }}>
+            {label}
+            <span style={{ color: "var(--text-tertiary)", fontWeight: 450 }}>{range}</span>
+          </span>
         ))}
       </div>
 
@@ -163,19 +153,18 @@ export default function RegistryPage() {
           {[1,2,3].map((i) => <div key={i} className="skeleton" style={{ height: 88, borderRadius: "var(--radius-md)" }} />)}
         </div>
       ) : clusters.length === 0 ? (
-        <div style={{
-          textAlign: "center", padding: "var(--space-2xl)",
-          border: "1px dashed var(--border-default)",
-          borderRadius: "var(--radius-lg)", color: "var(--text-tertiary)",
-        }}>
-          <span style={{ fontSize: "2rem", display: "block", marginBottom: "var(--space-md)" }}>🗂️</span>
-          No attribution data yet. Run the attribution agent to populate.
+        <div className="empty">
+          <FolderOpen {...icon.lg} aria-hidden />
+          <h3>No attributions yet</h3>
+          <p>Run the attribution agent to populate the registry.</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-xl)" }}>
           {chronic.length > 0 && (
             <div>
-              <h3 style={{ marginBottom: "var(--space-md)", color: "#ef4444" }}>🚨 Chronic Offenders ({chronic.length})</h3>
+              <h3 style={{ marginBottom: "var(--space-md)" }}>
+                Chronic offenders <span className="mono" style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>{chronic.length}</span>
+              </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
                 {chronic.map((c) => <OffenderCard key={c.key} cluster={c} />)}
               </div>
@@ -183,7 +172,9 @@ export default function RegistryPage() {
           )}
           {memoTier.length > 0 && (
             <div>
-              <h3 style={{ marginBottom: "var(--space-md)", color: "#f59e0b" }}>⚠️ Enforcement Memo Tier ({memoTier.length})</h3>
+              <h3 style={{ marginBottom: "var(--space-md)" }}>
+                Enforcement memo tier <span className="mono" style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>{memoTier.length}</span>
+              </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
                 {memoTier.map((c) => <OffenderCard key={c.key} cluster={c} />)}
               </div>
@@ -191,7 +182,9 @@ export default function RegistryPage() {
           )}
           {advisory.length > 0 && (
             <div>
-              <h3 style={{ marginBottom: "var(--space-md)", color: "#3b82f6" }}>📋 Advisory Tier ({advisory.length})</h3>
+              <h3 style={{ marginBottom: "var(--space-md)" }}>
+                Advisory tier <span className="mono" style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>{advisory.length}</span>
+              </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
                 {advisory.map((c) => <OffenderCard key={c.key} cluster={c} />)}
               </div>

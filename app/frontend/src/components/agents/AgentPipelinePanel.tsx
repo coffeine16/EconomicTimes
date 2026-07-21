@@ -11,25 +11,14 @@
  * the architecture explainer — the flow, in order, with what each agent does.
  */
 import type { AgentState, AgentName } from "@/lib/types";
-import { AGENT_LABELS, AGENT_DESCRIPTIONS, AGENT_ORDER } from "@/lib/constants";
-
-const AGENT_ICON: Record<AgentName, string> = {
-  detection:      "🛰️",
-  attribution:    "🔍",
-  forecast:       "📈",
-  prioritisation: "🎯",
-  memo:           "📄",
-  advisory:       "📢",
-  voice:          "🔊",
-  ledger:         "📒",
-  audit:          "🩺",
-};
+import { AGENT_LABELS, AGENT_DESCRIPTIONS, AGENT_ORDER, AGENT_ICONS } from "@/lib/constants";
+import { icon, X, Play, LoaderCircle, Check } from "@/components/Icon";
 
 const STATUS = {
-  idle:    { color: "var(--border-strong)", ring: "var(--border-strong)", label: "" },
-  running: { color: "var(--accent-blue)",   ring: "var(--accent-blue)",   label: "running" },
-  done:    { color: "var(--accent-emerald)",ring: "var(--accent-emerald)",label: "done" },
-  error:   { color: "var(--accent-red)",    ring: "var(--accent-red)",    label: "failed" },
+  idle:    { color: "var(--text-tertiary)", ring: "var(--border-default)", label: "" },
+  running: { color: "var(--accent)",        ring: "var(--accent)",         label: "running" },
+  done:    { color: "var(--positive)",      ring: "var(--positive-line)",  label: "done" },
+  error:   { color: "var(--critical)",      ring: "var(--critical-line)",  label: "failed" },
 } as const;
 
 export default function AgentPipelinePanel({
@@ -54,10 +43,12 @@ export default function AgentPipelinePanel({
         onClick={onClose}
         style={{
           position: "fixed", inset: 0, zIndex: "var(--z-modal)",
-          background: "rgba(0,0,0,0.45)",
+          background: "var(--scrim)",
+          backdropFilter: "blur(2px)",
           opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none",
           transition: "opacity var(--transition-normal)",
         }}
+        aria-hidden
       />
       {/* Drawer — SOLID, not glass: this is a content panel, and a translucent
           one lets the map bleed through the text and reads as broken. */}
@@ -66,7 +57,8 @@ export default function AgentPipelinePanel({
           position: "fixed", top: 0, bottom: 0, right: 0,
           width: "min(400px, 90vw)", zIndex: "calc(var(--z-modal) + 1)",
           transform: open ? "translateX(0)" : "translateX(100%)",
-          transition: "transform var(--transition-slow)",
+          visibility: open ? "visible" : "hidden",
+          transition: "transform var(--transition-slow), visibility var(--transition-slow)",
           background: "var(--bg-primary)",
           borderLeft: "1px solid var(--border-default)",
           display: "flex", flexDirection: "column",
@@ -74,15 +66,25 @@ export default function AgentPipelinePanel({
         }}
       >
         {/* Header */}
-        <div style={{ padding: "var(--space-lg)", borderBottom: "1px solid var(--border-subtle)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ padding: "var(--space-md) var(--space-lg)", borderBottom: "1px solid var(--border-subtle)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
             <div>
               <h3 style={{ margin: 0 }}>Agent Pipeline</h3>
-              <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", marginTop: 2 }}>
-                9 agents · LangGraph · detect → dispatch
+              <div style={{ fontSize: "0.74rem", color: "var(--text-tertiary)", marginTop: 2 }}>
+                {AGENT_ORDER.length} agents · LangGraph · detect → dispatch
               </div>
             </div>
-            <button onClick={onClose} className="btn btn-ghost btn-icon" title="Close">✕</button>
+            <button onClick={onClose} className="btn btn-quiet btn-icon" aria-label="Close pipeline panel">
+              <X {...icon.md} aria-hidden />
+            </button>
+          </div>
+
+          {/* Progress rail — a run's state at a glance, without reading nine rows. */}
+          <div
+            className="meter"
+            style={{ marginTop: "var(--space-md)", height: 2, ["--tint" as string]: "var(--positive)" }}
+          >
+            <i style={{ width: `${(doneCount / AGENT_ORDER.length) * 100}%` }} />
           </div>
 
           <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
@@ -90,11 +92,19 @@ export default function AgentPipelinePanel({
               className="btn btn-primary btn-sm"
               onClick={() => onRun("all")}
               disabled={running}
-              style={{ flex: 1, justifyContent: "center" }}
+              style={{ flex: 1 }}
             >
-              {running
-                ? <><span className="animate-spin" style={{ display: "inline-block" }}>⬡</span> Running {doneCount}/{AGENT_ORDER.length}</>
-                : <>▶ Run Full Pipeline</>}
+              {running ? (
+                <>
+                  <LoaderCircle {...icon.sm} className="animate-spin" aria-hidden />
+                  Running {doneCount}/{AGENT_ORDER.length}
+                </>
+              ) : (
+                <>
+                  <Play {...icon.sm} aria-hidden />
+                  Run full pipeline
+                </>
+              )}
             </button>
             {anyDone && !running && (
               <button className="btn btn-ghost btn-sm" onClick={onReset}>Reset</button>
@@ -109,28 +119,29 @@ export default function AgentPipelinePanel({
             const s = STATUS[st];
             const dur = durOf(name);
             const last = i === AGENT_ORDER.length - 1;
+            const Glyph = AGENT_ICONS[name];
             return (
-              <div key={name} style={{ display: "flex", gap: "var(--space-md)" }}>
+              <div key={name} style={{ display: "flex", gap: 12 }}>
                 {/* Rail: node + connector */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
                   <div
+                    className={st === "running" ? "animate-breathe" : undefined}
                     style={{
-                      width: 34, height: 34, borderRadius: "50%",
-                      border: `2px solid ${s.ring}`,
-                      background: st === "idle" ? "transparent" : `${s.color}1f`,
+                      width: 28, height: 28, borderRadius: "50%",
+                      border: `1px solid ${s.ring}`,
+                      background: st === "idle" ? "transparent" : `color-mix(in srgb, ${s.color} 12%, transparent)`,
+                      color: s.color,
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "1rem",
-                      animation: st === "running" ? "pulse 1.3s ease-in-out infinite" : undefined,
-                      transition: "all 0.3s",
+                      transition: "border-color var(--transition-normal), background var(--transition-normal), color var(--transition-normal)",
                     }}
                   >
-                    {AGENT_ICON[name]}
+                    <Glyph {...icon.sm} aria-hidden />
                   </div>
                   {!last && (
                     <div style={{
-                      width: 2, flex: 1, minHeight: 22, marginTop: 2, marginBottom: 2,
-                      background: st === "done" ? "var(--accent-emerald)" : "var(--border-subtle)",
-                      transition: "background 0.3s",
+                      width: 1, flex: 1, minHeight: 20, marginTop: 3, marginBottom: 3,
+                      background: st === "done" ? "var(--positive-line)" : "var(--border-subtle)",
+                      transition: "background var(--transition-normal)",
                     }} />
                   )}
                 </div>
@@ -141,18 +152,30 @@ export default function AgentPipelinePanel({
                   disabled={running}
                   style={{
                     flex: 1, textAlign: "left", background: "transparent", border: "none",
-                    cursor: running ? "default" : "pointer", padding: "2px 0 var(--space-md)",
+                    fontFamily: "inherit",
+                    cursor: running ? "default" : "pointer", padding: "1px 0 var(--space-md)",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "var(--text-primary)" }}>
+                    <span style={{ fontWeight: 550, fontSize: "0.85rem", color: "var(--text-primary)" }}>
                       {AGENT_LABELS[name]}
                     </span>
-                    <span style={{ fontSize: "0.72rem", color: s.color, fontWeight: 600, whiteSpace: "nowrap" }}>
-                      {st === "done" && dur ? `✓ ${(dur / 1000).toFixed(1)}s` : s.label}
+                    <span
+                      className="mono"
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 3,
+                        fontSize: "0.68rem", color: s.color, fontWeight: 500, whiteSpace: "nowrap",
+                      }}
+                    >
+                      {st === "done" && dur ? (
+                        <>
+                          <Check {...icon.sm} aria-hidden />
+                          {(dur / 1000).toFixed(1)}s
+                        </>
+                      ) : s.label}
                     </span>
                   </div>
-                  <div style={{ fontSize: "0.76rem", color: "var(--text-tertiary)", lineHeight: 1.45, marginTop: 2 }}>
+                  <div style={{ fontSize: "0.745rem", color: "var(--text-tertiary)", lineHeight: 1.45, marginTop: 2 }}>
                     {AGENT_DESCRIPTIONS[name]}
                   </div>
                 </button>

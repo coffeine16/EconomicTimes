@@ -13,51 +13,53 @@ interface Props {
 const PERSISTENCE_OPTIONS: HotspotKind[] = ["chronic", "emerging", "acute"];
 const SOURCE_OPTIONS: SourceCategory[] = ["industrial", "waste_burning", "construction", "traffic"];
 
-const PERSIST_COLORS: Record<HotspotKind, string> = {
+// The chip's active colour is the DATA colour of the thing it filters, passed
+// through --tint. That is the one place colour is allowed to be loud here,
+// because it matches what the map draws.
+const PERSIST_TINT: Record<HotspotKind, string> = {
   chronic:  "var(--persist-chronic)",
   emerging: "var(--persist-emerging)",
   acute:    "var(--persist-acute)",
 };
+const SOURCE_TINT: Record<SourceCategory, string> = {
+  industrial:    "var(--source-industrial)",
+  waste_burning: "var(--source-waste-burning)",
+  construction:  "var(--source-construction)",
+  traffic:       "var(--source-traffic)",
+};
 
-function MultiChip<T extends string>({
-  options,
-  selected,
-  onToggle,
-  labels,
-  colors,
+function ChipGroup<T extends string>({
+  label, options, selected, onToggle, labels, tints,
 }: {
+  label: string;
   options: T[];
   selected: T[];
   onToggle: (val: T) => void;
   labels: Record<T, string>;
-  colors?: Partial<Record<T, string>>;
+  tints?: Partial<Record<T, string>>;
 }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-      {options.map((opt) => {
-        const active = selected.includes(opt);
-        return (
-          <button
-            key={opt}
-            onClick={() => onToggle(opt)}
-            style={{
-              padding: "3px 8px",
-              borderRadius: "var(--radius-full)",
-              border: `1px solid ${active ? (colors?.[opt] ?? "var(--accent-blue)") : "var(--border-default)"}`,
-              background: active ? `${colors?.[opt] ?? "var(--accent-blue)"}20` : "transparent",
-              color: active ? (colors?.[opt] ?? "var(--accent-blue)") : "var(--text-tertiary)",
-              fontSize: "0.72rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "var(--font-sans)",
-              transition: "all var(--transition-fast)",
-            }}
-          >
-            {labels[opt]}
-          </button>
-        );
-      })}
-    </div>
+    <fieldset style={{ border: "none" }}>
+      <legend className="section-label" style={{ marginBottom: 6 }}>{label}</legend>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {options.map((opt) => {
+          const active = selected.includes(opt);
+          return (
+            <button
+              key={opt}
+              type="button"
+              className="chip"
+              data-active={active}
+              aria-pressed={active}
+              onClick={() => onToggle(opt)}
+              style={tints?.[opt] ? ({ ["--tint" as string]: tints[opt] }) : undefined}
+            >
+              {labels[opt]}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
   );
 }
 
@@ -66,42 +68,34 @@ function toggle<T>(arr: T[], val: T): T[] {
 }
 
 export default function FilterBar({ filters, onSources, onPersistence, onReset }: Props) {
-  const hasActive = filters.source_types.length > 0 || filters.persistence_types.length > 0;
+  const activeCount = filters.source_types.length + filters.persistence_types.length;
 
   return (
     <div
       className="glass"
       style={{
-        borderRadius: "var(--radius-md)",
+        borderRadius: "var(--radius-lg)",
         overflow: "hidden",
-        minWidth: 170,
+        minWidth: 176,
+        boxShadow: "var(--shadow-md)",
       }}
     >
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "8px 12px",
-          borderBottom: "1px solid var(--border-subtle)",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          padding: "8px 12px", borderBottom: "1px solid var(--border-subtle)",
         }}
       >
-        <span
-          style={{
-            fontSize: "0.7rem", fontWeight: 600,
-            letterSpacing: "0.06em", textTransform: "uppercase",
-            color: "var(--text-tertiary)",
-          }}
-        >
-          Filters
+        <span className="section-label">
+          Filters{activeCount > 0 && ` · ${activeCount}`}
         </span>
-        {hasActive && (
+        {activeCount > 0 && (
           <button
             onClick={onReset}
             style={{
-              background: "none", border: "none", cursor: "pointer",
-              fontSize: "0.7rem", color: "var(--accent-blue)",
-              fontFamily: "var(--font-sans)",
+              background: "none", border: "none", cursor: "pointer", padding: 0,
+              fontSize: "0.7rem", color: "var(--accent)", fontFamily: "inherit",
+              fontWeight: 520,
             }}
           >
             Clear
@@ -109,33 +103,23 @@ export default function FilterBar({ filters, onSources, onPersistence, onReset }
         )}
       </div>
 
-      <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {/* Persistence */}
-        <div>
-          <div style={{ fontSize: "0.68rem", color: "var(--text-tertiary)", marginBottom: 5, fontWeight: 600 }}>
-            PERSISTENCE
-          </div>
-          <MultiChip
-            options={PERSISTENCE_OPTIONS}
-            selected={filters.persistence_types}
-            onToggle={(v) => onPersistence(toggle(filters.persistence_types, v))}
-            labels={PERSISTENCE_LABELS}
-            colors={PERSIST_COLORS}
-          />
-        </div>
-
-        {/* Source type */}
-        <div>
-          <div style={{ fontSize: "0.68rem", color: "var(--text-tertiary)", marginBottom: 5, fontWeight: 600 }}>
-            SOURCE TYPE
-          </div>
-          <MultiChip
-            options={SOURCE_OPTIONS}
-            selected={filters.source_types}
-            onToggle={(v) => onSources(toggle(filters.source_types, v))}
-            labels={SOURCE_LABELS}
-          />
-        </div>
+      <div style={{ padding: "10px 12px", display: "flex", flexDirection: "column", gap: 12 }}>
+        <ChipGroup
+          label="Persistence"
+          options={PERSISTENCE_OPTIONS}
+          selected={filters.persistence_types}
+          onToggle={(v) => onPersistence(toggle(filters.persistence_types, v))}
+          labels={PERSISTENCE_LABELS}
+          tints={PERSIST_TINT}
+        />
+        <ChipGroup
+          label="Source type"
+          options={SOURCE_OPTIONS}
+          selected={filters.source_types}
+          onToggle={(v) => onSources(toggle(filters.source_types, v))}
+          labels={SOURCE_LABELS}
+          tints={SOURCE_TINT}
+        />
       </div>
     </div>
   );

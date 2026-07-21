@@ -1,6 +1,7 @@
 "use client";
 import useSWR from "swr";
 import { api } from "@/lib/api";
+import { icon, Globe } from "@/components/Icon";
 import type { CityComparison } from "@/lib/types";
 
 /**
@@ -34,12 +35,10 @@ function SkillCell({ v }: { v: number | null | undefined }) {
   const { text, positive } = fmtPct(v);
   const color =
     positive === null ? "var(--text-tertiary)"
-    : positive ? "var(--accent-emerald)"
-    : "var(--accent-amber, #f59e0b)";
+    : positive ? "var(--positive)"
+    : "var(--caution)";
   return (
-    <span style={{ fontFamily: "var(--font-mono)", fontWeight: 600, color }}>
-      {text}
-    </span>
+    <span className="mono" style={{ fontWeight: 550, color }}>{text}</span>
   );
 }
 
@@ -48,11 +47,8 @@ function SkillNarrative({ rows }: { rows: CityComparison[] }) {
   const h24Wins = rows.filter((r) => (r.forecast_skill_vs_persistence_pct.h24 ?? 0) < 0).length;
   const h72Wins = rows.filter((r) => (r.forecast_skill_vs_persistence_pct.h72 ?? 0) > 0).length;
   return (
-    <div className="card" style={{ borderLeft: "3px solid var(--accent-blue)", marginBottom: "var(--space-xl)" }}>
-      <div style={{
-        fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.05em",
-        textTransform: "uppercase", color: "var(--accent-blue)", marginBottom: 6,
-      }}>
+    <div className="card card-rail" style={{ ["--rail" as string]: "var(--accent)", marginBottom: "var(--space-xl)" }}>
+      <div style={{ fontSize: "0.875rem", fontWeight: 550, color: "var(--text-primary)", marginBottom: 7 }}>
         Forecast skill vs persistence — the direction is the finding
       </div>
       <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0, lineHeight: 1.55 }}>
@@ -71,13 +67,13 @@ function SkillNarrative({ rows }: { rows: CityComparison[] }) {
 function ComparisonTable({ rows }: { rows: CityComparison[] }) {
   return (
     <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: "var(--space-xl)" }}>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 620 }}>
+      <div className="scroll-x">
+        <table className="data-table" style={{ minWidth: 620 }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
-              <th style={thStyle}>Metric</th>
+            <tr>
+              <th>Metric</th>
               {rows.map((r) => (
-                <th key={r.city} style={{ ...thStyle, textAlign: "right" }}>
+                <th key={r.city} style={{ textAlign: "right" }}>
                   {CITY_LABEL[r.city] ?? r.city}
                 </th>
               ))}
@@ -103,26 +99,26 @@ function ComparisonTable({ rows }: { rows: CityComparison[] }) {
               render={(r) => (r.attribution.mean_confidence != null ? r.attribution.mean_confidence.toFixed(3) : "—")}
               mono
             />
-            <tr style={{ borderBottom: "1px solid var(--border-subtle)", background: "rgba(59,130,246,0.04)" }}>
-              <td style={{ ...tdStyle, fontWeight: 600 }}>Forecast skill vs persistence · 24h</td>
+            <tr style={{ background: "var(--accent-soft)" }}>
+              <td style={{ fontWeight: 550, color: "var(--text-primary)" }}>Forecast skill vs persistence · 24h</td>
               {rows.map((r) => (
-                <td key={r.city} style={{ ...tdStyle, textAlign: "right" }}>
+                <td key={r.city} className="num">
                   <SkillCell v={r.forecast_skill_vs_persistence_pct.h24} />
                 </td>
               ))}
             </tr>
-            <tr style={{ borderBottom: "1px solid var(--border-subtle)", background: "rgba(59,130,246,0.04)" }}>
-              <td style={{ ...tdStyle, fontWeight: 600 }}>· 48h</td>
+            <tr style={{ background: "var(--accent-soft)" }}>
+              <td style={{ fontWeight: 550, color: "var(--text-primary)" }}>· 48h</td>
               {rows.map((r) => (
-                <td key={r.city} style={{ ...tdStyle, textAlign: "right" }}>
+                <td key={r.city} className="num">
                   <SkillCell v={r.forecast_skill_vs_persistence_pct.h48} />
                 </td>
               ))}
             </tr>
-            <tr style={{ borderBottom: "1px solid var(--border-subtle)", background: "rgba(59,130,246,0.04)" }}>
-              <td style={{ ...tdStyle, fontWeight: 600 }}>· 72h</td>
+            <tr style={{ background: "var(--accent-soft)" }}>
+              <td style={{ fontWeight: 550, color: "var(--text-primary)" }}>· 72h</td>
               {rows.map((r) => (
-                <td key={r.city} style={{ ...tdStyle, textAlign: "right" }}>
+                <td key={r.city} className="num">
                   <SkillCell v={r.forecast_skill_vs_persistence_pct.h72} />
                 </td>
               ))}
@@ -145,15 +141,14 @@ function MetricRow({
   mono?: boolean;
 }) {
   return (
-    <tr style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-      <td style={tdStyle}>{label}</td>
+    <tr>
+      <td>{label}</td>
       {rows.map((r) => (
-        <td key={r.city} style={{
-          ...tdStyle, textAlign: "right",
-          fontFamily: mono ? "var(--font-mono)" : undefined,
-          color: mono ? "var(--text-primary)" : "var(--text-secondary)",
-          fontSize: mono ? "0.82rem" : "0.8rem",
-        }}>
+        <td
+          key={r.city}
+          className={mono ? "num" : undefined}
+          style={{ textAlign: "right", color: mono ? "var(--text-primary)" : undefined }}
+        >
           {render(r)}
         </td>
       ))}
@@ -161,27 +156,12 @@ function MetricRow({
   );
 }
 
-const thStyle: React.CSSProperties = {
-  padding: "10px 14px", textAlign: "left", fontSize: "0.7rem",
-  fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em",
-  textTransform: "uppercase", whiteSpace: "nowrap",
-};
-const tdStyle: React.CSSProperties = {
-  padding: "10px 14px", textAlign: "left", fontSize: "0.82rem",
-  color: "var(--text-secondary)", whiteSpace: "nowrap",
-};
-
 function EmptyState() {
   return (
-    <div style={{
-      display: "flex", flexDirection: "column", alignItems: "center",
-      justifyContent: "center", minHeight: 280, gap: "var(--space-md)",
-      border: "1px dashed var(--border-default)", borderRadius: "var(--radius-md)",
-      color: "var(--text-tertiary)", padding: "var(--space-2xl)", textAlign: "center",
-    }}>
-      <span style={{ fontSize: "2rem" }}>🌏</span>
+    <div className="empty" style={{ minHeight: 280 }}>
+      <Globe {...icon.lg} aria-hidden />
       <h3>No city runs yet</h3>
-      <p style={{ maxWidth: 440, fontSize: "0.875rem" }}>
+      <p style={{ maxWidth: 460 }}>
         Each city here is a full live pipeline run. Generate one with{" "}
         <code style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}>
           AQ_CITY=delhi AQ_WINDOW_END=2025-11-30 python scripts/run_pipeline.py --full
@@ -200,10 +180,10 @@ export default function ComparePage() {
   const rows = data ?? [];
 
   return (
-    <div className="page-pad" style={{ padding: "var(--space-xl)", maxWidth: 1100, margin: "0 auto" }}>
-      <div style={{ marginBottom: "var(--space-lg)" }}>
-        <h1 style={{ marginBottom: 8 }}>Multi-City Intelligence</h1>
-        <p style={{ maxWidth: 760 }}>
+    <div className="page" style={{ maxWidth: 1100, overflowY: "auto", height: "100%" }}>
+      <div className="page-head">
+        <h1>Multi-city intelligence</h1>
+        <p>
           One platform, any Indian city, <strong>zero new code</strong>. Each column below is a
           full <strong>live</strong> pipeline run — real Sentinel-5P, NASA FIRMS, CPCB/OpenAQ
           stations and OpenStreetMap — over the same window. Nothing here is synthetic or
@@ -214,7 +194,7 @@ export default function ComparePage() {
 
       {isLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton" style={{ height: 44, borderRadius: 6 }} />)}
+          {[1, 2, 3, 4].map((i) => <div key={i} className="skeleton" style={{ height: 44 }} />)}
         </div>
       ) : rows.length === 0 ? (
         <EmptyState />

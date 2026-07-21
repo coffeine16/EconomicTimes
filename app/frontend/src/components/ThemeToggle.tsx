@@ -5,6 +5,7 @@
  * the inline script in layout.tsx; this just mirrors and mutates it.
  */
 import { useEffect, useState } from "react";
+import { icon, Sun, Moon } from "@/components/Icon";
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -24,12 +25,13 @@ export default function ThemeToggle() {
   return (
     <button
       onClick={toggle}
-      className="btn btn-ghost btn-icon"
+      className="btn btn-quiet btn-icon"
       title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-      aria-label="Toggle colour theme"
-      style={{ fontSize: "1rem" }}
+      aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
     >
-      {theme === "dark" ? "☀️" : "🌙"}
+      {theme === "dark"
+        ? <Sun {...icon.md} aria-hidden />
+        : <Moon {...icon.md} aria-hidden />}
     </button>
   );
 }

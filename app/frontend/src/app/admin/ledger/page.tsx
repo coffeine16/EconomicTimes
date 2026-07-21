@@ -2,6 +2,7 @@
 import useSWR from "swr";
 import { useCity } from "@/lib/CityContext";
 import { api } from "@/lib/api";
+import { icon, ClipboardList } from "@/components/Icon";
 import type { Ledger, LedgerEntry } from "@/lib/types";
 
 /**
@@ -23,34 +24,28 @@ import type { Ledger, LedgerEntry } from "@/lib/types";
  */
 
 function StatusPill({ status }: { status: LedgerEntry["status"] }) {
-  const map: Record<string, { label: string; color: string }> = {
-    actioned: { label: "Actioned", color: "var(--accent-emerald)" },
-    dispatched: { label: "Dispatched", color: "var(--accent-amber, #f59e0b)" },
-    awaiting_outcome: { label: "Awaiting outcome", color: "var(--text-tertiary)" },
+  const map: Record<string, { label: string; variant: string }> = {
+    actioned:         { label: "Actioned",         variant: "badge-positive" },
+    dispatched:       { label: "Dispatched",       variant: "badge-caution" },
+    awaiting_outcome: { label: "Awaiting outcome", variant: "badge-diffuse" },
   };
-  const { label, color } = map[status] ?? map.awaiting_outcome;
-  return (
-    <span style={{
-      padding: "2px 8px", borderRadius: "var(--radius-full)",
-      background: `${color}1f`, color, border: `1px solid ${color}40`,
-      fontSize: "0.72rem", fontWeight: 600, whiteSpace: "nowrap",
-    }}>{label}</span>
-  );
+  const { label, variant } = map[status] ?? map.awaiting_outcome;
+  return <span className={`badge ${variant}`}>{label}</span>;
 }
 
 function ClaimCard({ title, tone, children }: {
   title: string; tone: "real" | "pending"; children: React.ReactNode;
 }) {
-  const color = tone === "real" ? "var(--accent-emerald)" : "var(--accent-amber, #f59e0b)";
+  const tint = tone === "real" ? "var(--positive)" : "var(--caution)";
   return (
-    <div className="card" style={{ borderLeft: `3px solid ${color}` }}>
-      <div style={{
-        fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.05em",
-        textTransform: "uppercase", color, marginBottom: 6,
-      }}>
-        {title} {tone === "real" ? "· measured" : "· not yet measured"}
+    <div className="card card-rail" style={{ ["--rail" as string]: tint }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 7 }}>
+        <span style={{ fontSize: "0.875rem", fontWeight: 550, color: "var(--text-primary)" }}>{title}</span>
+        <span className={`badge ${tone === "real" ? "badge-positive" : "badge-caution"}`}>
+          {tone === "real" ? "measured" : "not yet measured"}
+        </span>
       </div>
-      <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", margin: 0, lineHeight: 1.5 }}>
+      <p style={{ fontSize: "0.83rem", color: "var(--text-secondary)", margin: 0, lineHeight: 1.55 }}>
         {children}
       </p>
     </div>
@@ -67,15 +62,10 @@ function shortTime(iso?: string | null) {
 function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
   if (!entries.length) {
     return (
-      <div style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", minHeight: 240, gap: "var(--space-md)",
-        border: "1px dashed var(--border-default)", borderRadius: "var(--radius-md)",
-        color: "var(--text-tertiary)", padding: "var(--space-2xl)", textAlign: "center",
-      }}>
-        <span style={{ fontSize: "2rem" }}>📋</span>
+      <div className="empty" style={{ border: "none", minHeight: 240 }}>
+        <ClipboardList {...icon.lg} aria-hidden />
         <h3>No actions tracked yet</h3>
-        <p style={{ maxWidth: 380, fontSize: "0.875rem" }}>
+        <p>
           Run the pipeline to generate an enforcement queue. Each action is logged here
           with its response chain and a frozen counterfactual.
         </p>
@@ -83,46 +73,32 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
     );
   }
   const cols = ["Action", "Ward", "Source", "Signal", "Memo drafted",
-                "Counterfactual (+48h)", "Response", "Status"];
+                "Counterfactual +48h", "Response", "Status"];
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+    <div className="scroll-x">
+      <table className="data-table">
         <thead>
-          <tr style={{ borderBottom: "1px solid var(--border-default)" }}>
-            {cols.map((h) => (
-              <th key={h} style={{
-                padding: "8px 12px", textAlign: "left", fontSize: "0.7rem",
-                fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em",
-                textTransform: "uppercase", whiteSpace: "nowrap",
-              }}>{h}</th>
-            ))}
-          </tr>
+          <tr>{cols.map((h) => <th key={h}>{h}</th>)}</tr>
         </thead>
         <tbody>
           {entries.map((e) => (
-            <tr key={e.action_id} style={{ borderBottom: "1px solid var(--border-subtle)" }}>
-              <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}>
+            <tr key={e.action_id}>
+              <td className="mono" style={{ color: "var(--text-primary)" }}>
                 {e.action_id} · {e.zone_id}
               </td>
-              <td style={{ padding: "10px 12px", fontSize: "0.8rem" }}>{e.ward_name ?? e.ward_id}</td>
-              <td style={{ padding: "10px 12px", fontSize: "0.8rem", color: "var(--text-secondary)" }}>
-                {e.source ?? "—"}
-              </td>
-              <td style={{ padding: "10px 12px", fontSize: "0.78rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                {shortTime(e.response?.signal_at)}
-              </td>
-              <td style={{ padding: "10px 12px", fontSize: "0.78rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                {shortTime(e.response?.memo_drafted_at)}
-              </td>
-              <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}>
+              <td>{e.ward_name ?? e.ward_id}</td>
+              <td>{e.source ?? "—"}</td>
+              <td style={{ fontSize: "0.78rem" }}>{shortTime(e.response?.signal_at)}</td>
+              <td style={{ fontSize: "0.78rem" }}>{shortTime(e.response?.memo_drafted_at)}</td>
+              <td className="mono">
                 {e.counterfactual
-                  ? `AQI ${e.counterfactual.aqi_counterfactual} (${e.counterfactual.band_counterfactual})`
+                  ? `AQI ${e.counterfactual.aqi_counterfactual} · ${e.counterfactual.band_counterfactual}`
                   : "—"}
               </td>
-              <td style={{ padding: "10px 12px", fontFamily: "var(--font-mono)", fontSize: "0.8rem" }}>
+              <td className="mono">
                 {e.response?.response_hours != null ? `${e.response.response_hours.toFixed(1)}h` : "auto"}
               </td>
-              <td style={{ padding: "10px 12px" }}><StatusPill status={e.status} /></td>
+              <td><StatusPill status={e.status} /></td>
             </tr>
           ))}
         </tbody>
@@ -138,10 +114,10 @@ export default function LedgerPage() {
   const actioned = entries.filter((e) => e.status === "actioned").length;
 
   return (
-    <div className="page-pad" style={{ padding: "var(--space-xl)", maxWidth: 1200, margin: "0 auto" }}>
-      <div style={{ marginBottom: "var(--space-lg)" }}>
-        <h1 style={{ marginBottom: 8 }}>Intervention Ledger</h1>
-        <p style={{ maxWidth: 720 }}>
+    <div className="page" style={{ maxWidth: 1200, overflowY: "auto", height: "100%" }}>
+      <div className="page-head">
+        <h1>Intervention ledger</h1>
+        <p>
           The ledger reports two things, and keeps them apart on purpose:
           <strong> how fast</strong> a signal becomes a cited, dispatchable memo, and
           <strong> whether the intervention worked</strong>. The first is measured today;
@@ -149,10 +125,7 @@ export default function LedgerPage() {
         </p>
       </div>
 
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 1fr",
-        gap: "var(--space-md)", marginBottom: "var(--space-xl)",
-      }}>
+      <div className="grid-auto" style={{ ["--min" as string]: "320px", marginBottom: "var(--space-xl)" }}>
         <ClaimCard title="Response time" tone="real">
           Signal → attribution → cited memo → dispatch route is a single automated batch.
           The manual baseline — correlating a satellite signal to a served notice across
@@ -169,7 +142,7 @@ export default function LedgerPage() {
 
       {isLoading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 44, borderRadius: 6 }} />)}
+          {[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 44 }} />)}
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: "hidden" }}>

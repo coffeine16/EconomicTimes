@@ -21,6 +21,7 @@ import type { Hotspot, Attribution, Memo } from "@/lib/types";
 import { SOURCE_LABELS, PERSISTENCE_LABELS } from "@/lib/constants";
 import { SOURCE_COLORS } from "@/lib/colors";
 import { useCity } from "@/lib/CityContext";
+import { icon, ChevronDown, FileText, Crosshair, Check, Flame, Wind, Target } from "@/components/Icon";
 import MemoModal from "./MemoModal";
 
 interface Props {
@@ -92,26 +93,19 @@ function groupIntoZones(hotspots: Hotspot[]): Zone[] {
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
 function ConfidenceMeter({ value }: { value: number }) {
-  const color = value >= 0.7 ? "#10b981" : value >= 0.5 ? "#f59e0b" : "#ef4444";
+  // Three semantic tokens, not three raw hexes. Confidence is a JUDGEMENT about
+  // our own evidence, so it belongs in the state palette (positive/caution/
+  // critical) rather than getting an accent of its own.
+  const tint = value >= 0.7 ? "var(--positive)" : value >= 0.5 ? "var(--caution)" : "var(--critical)";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div
-        style={{
-          flex: 1, height: 4, background: "var(--border-subtle)",
-          borderRadius: "var(--radius-full)", overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${Math.round(value * 100)}%`,
-            height: "100%",
-            background: color,
-            borderRadius: "var(--radius-full)",
-            transition: "width 0.5s ease-out",
-          }}
-        />
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 96 }}
+      title={`Attribution confidence ${value.toFixed(2)}`}
+    >
+      <div className="meter" style={{ ["--tint" as string]: tint }}>
+        <i style={{ width: `${Math.round(value * 100)}%` }} />
       </div>
-      <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color, minWidth: 30 }}>
+      <span className="mono" style={{ fontSize: "0.72rem", color: tint, minWidth: 28 }}>
         {value.toFixed(2)}
       </span>
     </div>
@@ -127,37 +121,35 @@ function EPSBreakdown({ components, eps }: { components: Record<string, number>;
   ];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-        <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          EPS Breakdown
-        </span>
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.8rem", fontWeight: 700, color: "var(--accent-amber)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 2 }}>
+        <span className="section-label">EPS breakdown</span>
+        <span className="mono" style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--text-primary)" }}>
           {eps.toFixed(1)}
         </span>
       </div>
       {items.map(({ key, label, weight }) => {
         const val: number = (components[key] as number) ?? 0;
         return (
-          <div key={key} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ fontSize: "0.68rem", color: "var(--text-tertiary)", minWidth: 72 }}>{label}</span>
-            <div style={{ flex: 1, height: 3, background: "var(--border-subtle)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
-              <div style={{ width: `${Math.round(val * 100)}%`, height: "100%", background: "var(--accent-blue)", borderRadius: "var(--radius-full)" }} />
+          <div key={key} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: "0.68rem", color: "var(--text-tertiary)", minWidth: 74 }}>{label}</span>
+            <div className="meter">
+              <i style={{ width: `${Math.round(val * 100)}%` }} />
             </div>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.68rem", color: "var(--text-tertiary)", minWidth: 28 }}>
+            <span className="mono" style={{ fontSize: "0.68rem", color: "var(--text-tertiary)", minWidth: 24, textAlign: "right" }}>
               {(val * weight * 100).toFixed(0)}
             </span>
           </div>
         );
       })}
-      <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: 2, fontStyle: "italic" }}>
-        forecast_delta = 0 (forecast agent not yet built)
+      <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: 2 }}>
+        forecast_delta = 0 — forecast agent not yet built
       </div>
     </div>
   );
 }
 
 function EvidenceChain({ attribution }: { attribution: Attribution }) {
-  const sourceColor = SOURCE_COLORS[attribution.primary_source] ?? "#888";
+  const sourceColor = SOURCE_COLORS[attribution.primary_source] ?? "var(--text-tertiary)";
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
       <div
@@ -175,13 +167,11 @@ function EvidenceChain({ attribution }: { attribution: Attribution }) {
       </div>
       {attribution.evidence_factors.length > 0 && (
         <div>
-          <div style={{ fontSize: "0.68rem", fontWeight: 600, color: "var(--text-tertiary)", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-            Evidence
-          </div>
+          <div className="section-label" style={{ marginBottom: 6 }}>Evidence</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {attribution.evidence_factors.map((f, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "0.78rem", color: "var(--text-secondary)" }}>
-                <span style={{ color: "var(--accent-emerald)", marginTop: 1, flexShrink: 0 }}>✓</span>
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 7, fontSize: "0.775rem", lineHeight: 1.5, color: "var(--text-secondary)" }}>
+                <Check {...icon.sm} aria-hidden style={{ color: "var(--positive)", marginTop: 3, flexShrink: 0 }} />
                 {f}
               </div>
             ))}
@@ -189,10 +179,16 @@ function EvidenceChain({ attribution }: { attribution: Attribution }) {
         </div>
       )}
       {attribution.evidence?.meteorology && (
-        <div style={{ display: "flex", gap: "var(--space-md)", fontSize: "0.75rem", color: "var(--text-tertiary)", flexWrap: "wrap" }}>
-          <span>💨 {attribution.evidence.meteorology.wind_from_deg}° · {attribution.evidence.meteorology.wind_ms.toFixed(1)} m/s</span>
-          <span>🌡 BLH: {attribution.evidence.meteorology.blh_m}m
-            {attribution.evidence.meteorology.air_trapped && " ⚠ trapped"}
+        <div style={{ display: "flex", gap: "var(--space-md)", fontSize: "0.73rem", color: "var(--text-tertiary)", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <Wind {...icon.sm} aria-hidden />
+            {attribution.evidence.meteorology.wind_from_deg}° · {attribution.evidence.meteorology.wind_ms.toFixed(1)} m/s
+          </span>
+          <span>
+            BLH {attribution.evidence.meteorology.blh_m} m
+            {attribution.evidence.meteorology.air_trapped && (
+              <span style={{ color: "var(--caution)" }}> · trapped</span>
+            )}
           </span>
         </div>
       )}
@@ -215,7 +211,7 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
     expanded ? [city, "attribution", zone.lead_cell] : null,
     () => api.getAttribution(zone.lead_cell)
   );
-  const sourceColor = attribution ? SOURCE_COLORS[attribution.primary_source] : "#888";
+  const sourceColor = (attribution && SOURCE_COLORS[attribution.primary_source]) || "var(--text-tertiary)";
 
   // Memo modal — the demo climax. Fetch the precomputed enforcement memo for this
   // zone on click; render it in a modal.
@@ -240,11 +236,11 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
 
   return (
     <div
-      className="card"
+      className="card animate-fade-in"
       style={{
-        borderColor: isSelected ? "var(--accent-blue)" : "var(--border-subtle)",
-        background: isSelected ? "rgba(59,130,246,0.04)" : undefined,
-        animation: "fadeIn 0.2s ease-out",
+        borderColor: isSelected ? "var(--accent-line)" : "var(--border-subtle)",
+        background: isSelected ? "var(--accent-soft)" : undefined,
+        transition: "border-color var(--transition-fast), background var(--transition-fast)",
       }}
     >
       {/* Header */}
@@ -256,17 +252,16 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
           {/* Rank + badges */}
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
             <span
+              className="mono"
               style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "0.65rem",
-                fontWeight: 700,
+                fontSize: "0.65rem", fontWeight: 600,
                 color: "var(--text-tertiary)",
                 background: "var(--bg-tertiary)",
-                padding: "1px 6px",
-                borderRadius: "var(--radius-full)",
+                padding: "1px 5px",
+                borderRadius: "var(--radius-sm)",
               }}
             >
-              #{rank}
+              {rank}
             </span>
             <span className={`badge badge-${zone.kind}`}>{PERSISTENCE_LABELS[zone.kind]}</span>
           </div>
@@ -275,41 +270,52 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
             {zone.zone_id} · {zone.ward_name}
           </div>
           {/* Metrics */}
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+          <div className="mono" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.73rem", color: "var(--text-tertiary)" }}>
             {zone.pm25_med.toFixed(1)} µg/m³ · {zone.n_cells} cells
-            {zone.fires_6h > 0 && ` · 🔥 ${zone.fires_6h} fires`}
+            {zone.fires_6h > 0 && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--persist-acute)" }}>
+                · <Flame {...icon.sm} aria-hidden /> {zone.fires_6h}
+              </span>
+            )}
           </div>
         </div>
-        {/* Severity square */}
-        <div style={{ textAlign: "center", flexShrink: 0, marginLeft: "var(--space-sm)" }}>
-          <div
-            style={{
-              width: 44, height: 44, borderRadius: "var(--radius-sm)",
-              background: `rgba(239,68,68,${zone.severity.toFixed(2)})`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              border: "1px solid rgba(239,68,68,0.3)",
-            }}
-          >
-            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "white" }}>
-              {(zone.severity * 100).toFixed(0)}
-            </span>
+        {/* Severity. A solid red tile whose ALPHA encoded the value was
+            unreadable at the low end (white text on near-transparent) and
+            screamed at the high end. It is now a number with a proportional
+            bar — the value is legible at every level. */}
+        <div style={{ flexShrink: 0, marginLeft: "var(--space-sm)", width: 46, textAlign: "right" }}>
+          <div className="mono" style={{ fontSize: "1.05rem", fontWeight: 600, lineHeight: 1, color: "var(--text-primary)" }}>
+            {(zone.severity * 100).toFixed(0)}
           </div>
-          <div style={{ fontSize: "0.6rem", color: "var(--text-tertiary)", marginTop: 2 }}>SEV</div>
+          <div className="section-label" style={{ fontSize: "0.6rem", margin: "3px 0 4px" }}>sev</div>
+          <div className="meter" style={{ ["--tint" as string]: "var(--critical)" }}>
+            <i style={{ width: `${Math.round(zone.severity * 100)}%` }} />
+          </div>
         </div>
       </div>
 
       {/* Expand toggle */}
       <button
         onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
         style={{
           display: "flex", alignItems: "center", gap: 4,
           background: "none", border: "none", cursor: "pointer",
-          fontSize: "0.75rem", color: "var(--text-tertiary)",
-          fontFamily: "var(--font-sans)", padding: 0,
+          fontSize: "0.73rem", color: "var(--text-tertiary)",
+          fontFamily: "inherit", padding: 0,
           marginBottom: expanded ? 10 : 0,
+          transition: "color var(--transition-fast)",
         }}
       >
-        {expanded ? "▲ Collapse" : "▼ Evidence + EPS"}
+        <ChevronDown
+          {...icon.sm}
+          aria-hidden
+          style={{
+            transform: expanded ? "rotate(180deg)" : "none",
+            transition: "transform var(--transition-normal)",
+          }}
+        />
+        {expanded ? "Collapse" : "Evidence + EPS"}
       </button>
 
       {expanded && (
@@ -319,14 +325,11 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                 <span
+                  className="badge"
                   style={{
-                    padding: "2px 8px",
-                    borderRadius: "var(--radius-full)",
-                    background: `${sourceColor}20`,
-                    color: sourceColor,
-                    border: `1px solid ${sourceColor}40`,
-                    fontSize: "0.72rem",
-                    fontWeight: 700,
+                    ["--tint" as string]: sourceColor,
+                    ["--tint-soft" as string]: `${sourceColor}1f`,
+                    ["--tint-line" as string]: `${sourceColor}3d`,
                   }}
                 >
                   {SOURCE_LABELS[attribution.primary_source] ?? attribution.primary_source}
@@ -368,20 +371,24 @@ function ZoneCard({ zone, rank, isSelected, onSelect }: {
 
           {/* Action buttons */}
           <div style={{ display: "flex", gap: "var(--space-sm)" }}>
+            {/* One primary action per card. "Generate memo" is the product's
+                point; showing on the map is a navigation aid, so it is quiet.
+                They used to be two equally-weighted tinted buttons. */}
             <button
-              className="btn btn-amber btn-sm"
+              className="btn btn-primary btn-sm"
               onClick={(e) => { e.stopPropagation(); openMemo(); }}
-              style={{ flex: 1, justifyContent: "center" }}
+              style={{ flex: 1 }}
             >
-              📋 Generate Memo
+              <FileText {...icon.sm} aria-hidden />
+              Generate memo
             </button>
             <button
               className="btn btn-ghost btn-sm"
               onClick={(e) => { e.stopPropagation(); onSelect(); }}
-              style={{ flex: 1, justifyContent: "center" }}
               title="Select this zone on the map"
             >
-              🗺️ Show on map
+              <Crosshair {...icon.sm} aria-hidden />
+              Show on map
             </button>
           </div>
         </div>
@@ -427,15 +434,15 @@ export default function ActionQueue({ hotspots, loading, selectedCell, onSelectC
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
       {/* Panel header */}
-      <div style={{ padding: "12px var(--space-md)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <h4>Action Queue</h4>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem", color: "var(--text-tertiary)" }}>
+      <div style={{ padding: "11px var(--space-md)", borderBottom: "1px solid var(--border-subtle)", flexShrink: 0 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+          <h4>Action queue</h4>
+          <span className="mono" style={{ fontSize: "0.72rem", color: "var(--text-tertiary)" }}>
             {enforceableZones.length} zone{enforceableZones.length !== 1 ? "s" : ""}
           </span>
         </div>
-        <p style={{ fontSize: "0.75rem" }}>
-          Zone-level · sorted by severity · expand for evidence + EPS
+        <p style={{ fontSize: "0.73rem", color: "var(--text-tertiary)" }}>
+          Zone-level · sorted by severity
         </p>
       </div>
 
@@ -448,20 +455,15 @@ export default function ActionQueue({ hotspots, loading, selectedCell, onSelectC
             ))}
           </div>
         ) : enforceableZones.length === 0 && !loading ? (
-          <div style={{
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", height: 200,
-            color: "var(--text-tertiary)", fontSize: "0.875rem", textAlign: "center", gap: 8,
-          }}>
-            <span style={{ fontSize: "2rem" }}>⬡</span>
-            No enforceable zones detected.
-            Run the detection + attribution agents to refresh.
+          <div className="empty" style={{ border: "none", minHeight: 200 }}>
+            <Target {...icon.lg} aria-hidden />
+            <p>No enforceable zones detected. Run the detection and attribution agents to refresh.</p>
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
             {/* Enforceable zones */}
-            <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", padding: "4px 4px" }}>
-              Enforcement Queue ({enforceableZones.length})
+            <div className="section-label" style={{ padding: "4px" }}>
+              Enforcement queue · {enforceableZones.length}
             </div>
             {enforceableZones.map((zone, i) => (
               <ZoneCard
@@ -476,33 +478,25 @@ export default function ActionQueue({ hotspots, loading, selectedCell, onSelectC
             {/* Diffuse zones — shown as a secondary list, NOT in the queue */}
             {diffuseZones.length > 0 && (
               <>
-                <div style={{
-                  fontSize: "0.68rem", fontWeight: 700, color: "var(--text-tertiary)",
-                  letterSpacing: "0.06em", textTransform: "uppercase",
-                  padding: "4px 4px", marginTop: 12,
-                  borderTop: "1px solid var(--border-subtle)", paddingTop: 12,
-                }}>
-                  Policy Targets — diffuse ({diffuseZones.length})
-                </div>
                 <div
+                  className="section-label"
                   style={{
-                    padding: "8px 10px",
-                    background: "var(--bg-tertiary)",
-                    borderRadius: "var(--radius-sm)",
-                    fontSize: "0.75rem",
-                    color: "var(--text-tertiary)",
-                    borderLeft: "2px solid var(--border-strong)",
+                    padding: "12px 4px 4px", marginTop: 12,
+                    borderTop: "1px solid var(--border-subtle)",
                   }}
                 >
-                  ℹ These zones are real pollution — but diffuse urban background
-                  with no single actor responsible. They remain on the map and feed
-                  ward advisories. Dispatching an inspector would issue a notice to a road.
+                  Policy targets · diffuse · {diffuseZones.length}
+                </div>
+                <div className="note">
+                  Real pollution, but diffuse urban background with no single actor
+                  responsible. These stay on the map and feed ward advisories —
+                  dispatching an inspector would serve a notice to a road.
                 </div>
                 {diffuseZones.map((zone) => (
                   <div
                     key={zone.zone_id}
-                    className="card"
-                    style={{ cursor: "pointer", opacity: 0.7 }}
+                    className="card card-hover"
+                    style={{ cursor: "pointer", background: "transparent" }}
                     onClick={() => onSelectCell(zone.lead_cell)}
                   >
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -510,7 +504,7 @@ export default function ActionQueue({ hotspots, loading, selectedCell, onSelectC
                         <div style={{ fontWeight: 500, fontSize: "0.85rem", marginBottom: 2 }}>
                           {zone.zone_id} · {zone.ward_name}
                         </div>
-                        <div style={{ fontSize: "0.75rem", color: "var(--text-tertiary)", fontFamily: "var(--font-mono)" }}>
+                        <div className="mono" style={{ fontSize: "0.73rem", color: "var(--text-tertiary)" }}>
                           {zone.pm25_med.toFixed(1)} µg/m³ · {zone.n_cells} cells
                         </div>
                       </div>
