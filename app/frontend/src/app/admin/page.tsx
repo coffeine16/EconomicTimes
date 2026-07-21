@@ -166,10 +166,13 @@ export default function AdminPage() {
 
       {/* ── Action Queue — right panel (desktop) / bottom sheet (mobile) ──────── */}
       {isMobile ? (
-        <div className="glass" style={{
+        // SOLID, not glass — a content panel over a busy map must not let the
+        // map (or the legend) bleed through its text.
+        <div style={{
           position: "fixed", left: 0, right: 0, bottom: 0,
           height: panelOpen ? "62vh" : 44,
           transition: "height var(--transition-slow)",
+          background: "var(--bg-primary)",
           borderTop: "1px solid var(--border-default)",
           borderTopLeftRadius: "var(--radius-lg)", borderTopRightRadius: "var(--radius-lg)",
           zIndex: "var(--z-panel)",
@@ -202,12 +205,13 @@ export default function AdminPage() {
           )}
         </div>
       ) : (
-        <div className="glass" style={{
+        <div style={{
           width: panelOpen ? 360 : 0,
           minWidth: panelOpen ? 320 : 0,
           maxWidth: 420,
           overflow: "hidden",
           transition: "width var(--transition-slow), min-width var(--transition-slow)",
+          background: "var(--bg-primary)",
           display: "flex", flexDirection: "column",
           borderLeft: "1px solid var(--border-subtle)",
           zIndex: "var(--z-panel)",

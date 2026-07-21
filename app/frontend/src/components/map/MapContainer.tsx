@@ -23,6 +23,7 @@ import { buildBlindSpotLayer } from "./layers/BlindSpotLayer";
 import { buildDispatchLayers } from "./layers/DispatchLayer";
 import { buildSatelliteLayer, type SatelliteCell } from "./layers/SatelliteLayer";
 import LegendBar from "./controls/LegendBar";
+import { useIsMobile } from "@/hooks/useMediaQuery";
 
 // ── Tooltip state ─────────────────────────────────────────────────────────────
 
@@ -87,20 +88,19 @@ export default function MapContainer({
     return () => obs.disconnect();
   }, []);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
+  const isMobile = useIsMobile();
 
   // Auto-center on whatever city the loaded data belongs to, and RE-center whenever
   // recenterKey (the city) changes — otherwise switching Delhi -> Chennai leaves the
   // viewport 1700 km away and the map looks empty until you pan there by hand.
-  const fittedKey = useRef<string | null>(null);
-  useEffect(() => {
-    const key = recenterKey ?? "default";
-    if (fittedKey.current === key) return;   // already centred for this city
+  /** Centroid of whatever this city's data covers, or null if nothing loaded. */
+  const dataCenter = useCallback((): { latitude: number; longitude: number } | null => {
     const cells =
       (hotspots.length && hotspots.map((h) => h.cell)) ||
       (wardCells.length && wardCells.map((w) => w.cell)) ||
       (fusionCells.length && fusionCells.map((f) => f.cell)) ||
       [];
-    if (!cells.length) return;               // wait for this city's data to load
+    if (!cells.length) return null;
     let sumLat = 0, sumLon = 0, n = 0;
     for (const c of cells) {
       try {
@@ -108,10 +108,24 @@ export default function MapContainer({
         sumLat += lat; sumLon += lon; n++;
       } catch { /* skip a malformed cell id */ }
     }
-    if (!n) return;
+    return n ? { latitude: sumLat / n, longitude: sumLon / n } : null;
+  }, [hotspots, wardCells, fusionCells]);
+
+  /** Snap back to the city — the Google-Maps-style recentre button. */
+  const recenter = useCallback(() => {
+    const c = dataCenter();
+    if (c) setViewState((vs) => ({ ...vs, ...c, zoom: 10.5, pitch: 30, bearing: 0 }));
+  }, [dataCenter]);
+
+  const fittedKey = useRef<string | null>(null);
+  useEffect(() => {
+    const key = recenterKey ?? "default";
+    if (fittedKey.current === key) return;   // already centred for this city
+    const c = dataCenter();
+    if (!c) return;                          // wait for this city's data to load
     fittedKey.current = key;
-    setViewState((vs) => ({ ...vs, latitude: sumLat / n, longitude: sumLon / n, zoom: 10.5 }));
-  }, [recenterKey, hotspots, wardCells, fusionCells]);
+    setViewState((vs) => ({ ...vs, ...c, zoom: 10.5 }));
+  }, [recenterKey, dataCenter]);
 
   const setTip = useCallback(
     (info: { x: number; y: number; content: React.ReactNode } | null) => setTooltip(info),
@@ -261,6 +275,38 @@ export default function MapContainer({
           attributionControl={{ compact: true }}
         />
       </DeckGL>
+
+      {/* Recentre — snap back to the city after panning away (Google-Maps style).
+          Sits above the legend so the two never collide. */}
+      <button
+        onClick={recenter}
+        title="Recentre on the city"
+        aria-label="Recentre map on the city"
+        style={{
+          position: "absolute",
+          right: 12,
+          bottom: isMobile ? 196 : 232,
+          zIndex: "var(--z-overlay)",
+          width: 38, height: 38, borderRadius: "50%",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: "var(--bg-primary)",
+          border: "1px solid var(--border-default)",
+          boxShadow: "var(--shadow-md)",
+          color: "var(--text-secondary)",
+          cursor: "pointer", fontSize: "1.05rem", lineHeight: 1,
+          transition: "color var(--transition-fast), border-color var(--transition-fast)",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = "var(--accent-blue)";
+          e.currentTarget.style.borderColor = "var(--accent-blue)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = "var(--text-secondary)";
+          e.currentTarget.style.borderColor = "var(--border-default)";
+        }}
+      >
+        ⌖
+      </button>
 
       {/* Context-sensitive legend */}
       <LegendBar layers={layers} />

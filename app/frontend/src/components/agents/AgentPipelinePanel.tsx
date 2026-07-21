@@ -59,14 +59,15 @@ export default function AgentPipelinePanel({
           transition: "opacity var(--transition-normal)",
         }}
       />
-      {/* Drawer */}
+      {/* Drawer — SOLID, not glass: this is a content panel, and a translucent
+          one lets the map bleed through the text and reads as broken. */}
       <aside
-        className="glass"
         style={{
           position: "fixed", top: 0, bottom: 0, right: 0,
           width: "min(400px, 90vw)", zIndex: "calc(var(--z-modal) + 1)",
           transform: open ? "translateX(0)" : "translateX(100%)",
           transition: "transform var(--transition-slow)",
+          background: "var(--bg-primary)",
           borderLeft: "1px solid var(--border-default)",
           display: "flex", flexDirection: "column",
           boxShadow: "var(--shadow-lg)",
