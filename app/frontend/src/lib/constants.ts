@@ -1,3 +1,9 @@
+import type { LucideIcon } from "lucide-react";
+import {
+  Building2, ClipboardList, Construction, Crosshair, Eye, FileText, Flame,
+  Gauge, Layers, MapPin, Megaphone, RadioTower, Route, SatelliteDish,
+  ScanLine, Target, TrendingUp, TriangleAlert, Truck, Volume2,
+} from "./../components/Icon";
 import type { AgentName, HotspotKind, SourceCategory, ReportCategory, LayerId } from "./types";
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
@@ -33,6 +39,17 @@ export const LAYER_LABELS: Record<LayerId, string> = {
   dispatch:   "Dispatch Routes",
 };
 
+export const LAYER_ICONS: Record<LayerId, LucideIcon> = {
+  fusion:     Gauge,
+  stations:   MapPin,
+  satellite:  SatelliteDish,
+  hotspots:   Target,
+  fires:      Flame,
+  wards:      Layers,
+  blindspots: Eye,
+  dispatch:   Route,
+};
+
 export const DEFAULT_LAYERS: Record<LayerId, boolean> = {
   fusion:     true,
   stations:   true,
@@ -56,6 +73,18 @@ export const AGENT_LABELS: Record<AgentName, string> = {
   voice:          "Voice",
   ledger:         "Ledger",
   audit:          "Network Audit",
+};
+
+export const AGENT_ICONS: Record<AgentName, LucideIcon> = {
+  detection:      ScanLine,
+  attribution:    Crosshair,
+  forecast:       TrendingUp,
+  prioritisation: ClipboardList,
+  memo:           FileText,
+  advisory:       Megaphone,
+  voice:          Volume2,
+  ledger:         Layers,
+  audit:          RadioTower,
 };
 
 export const AGENT_DESCRIPTIONS: Record<AgentName, string> = {
@@ -115,12 +144,12 @@ export const REPORT_CATEGORY_LABELS: Record<ReportCategory, string> = {
   other:            "Other",
 };
 
-export const REPORT_CATEGORY_ICONS: Record<ReportCategory, string> = {
-  waste_burning:    "🔥",
-  construction_dust: "🏗️",
-  industrial:       "🏭",
-  traffic:          "🚗",
-  other:            "⚠️",
+export const REPORT_CATEGORY_ICONS: Record<ReportCategory, LucideIcon> = {
+  waste_burning:     Flame,
+  construction_dust: Construction,
+  industrial:        Building2,
+  traffic:           Truck,
+  other:             TriangleAlert,
 };
 
 export const REPORT_STATUS_LABELS: Record<string, string> = {
@@ -131,12 +160,15 @@ export const REPORT_STATUS_LABELS: Record<string, string> = {
   resolved:     "Resolved",
 };
 
-export const REPORT_STATUS_COLORS: Record<string, string> = {
-  submitted:    "#6b7280",
-  under_review: "#3b82f6",
-  corroborated: "#f59e0b",
-  action_taken: "#10b981",
-  resolved:     "#22c55e",
+/** Badge variant per status — resolves to a design token, never a raw hex, so
+ *  the five statuses stay inside the app's three semantic colours instead of
+ *  spanning grey→blue→amber→emerald→green as five unrelated hues. */
+export const REPORT_STATUS_BADGE: Record<string, string> = {
+  submitted:    "badge-diffuse",
+  under_review: "badge-accent",
+  corroborated: "badge-caution",
+  action_taken: "badge-positive",
+  resolved:     "badge-positive",
 };
 
 // ─── Satellite ────────────────────────────────────────────────────────────────
