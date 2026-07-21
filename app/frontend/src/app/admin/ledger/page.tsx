@@ -1,5 +1,6 @@
 "use client";
 import useSWR from "swr";
+import { useCity } from "@/lib/CityContext";
 import { api } from "@/lib/api";
 import type { Ledger, LedgerEntry } from "@/lib/types";
 
@@ -131,7 +132,8 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
 }
 
 export default function LedgerPage() {
-  const { data, isLoading } = useSWR<Ledger | null>("ledger", () => api.getLedger());
+  const { city } = useCity();
+  const { data, isLoading } = useSWR<Ledger | null>([city, "ledger"], () => api.cityLedger(city));
   const entries = data?.entries ?? [];
   const actioned = entries.filter((e) => e.status === "actioned").length;
 

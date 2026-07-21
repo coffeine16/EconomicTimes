@@ -5,6 +5,7 @@
  * 2. Sensor Anomaly Flags: stations reading flat while satellite spikes → malfunction/tampering review
  */
 import useSWR from "swr";
+import { useCity } from "@/lib/CityContext";
 import { api } from "@/lib/api";
 import type { AuditResponse, BlindSpot, SensorFlag } from "@/lib/types";
 
@@ -112,9 +113,10 @@ function SensorFlagCard({ flag }: { flag: SensorFlag }) {
 }
 
 export default function AuditPage() {
+  const { city } = useCity();
   const { data, isLoading } = useSWR<AuditResponse>(
-    "audit",
-    () => api.getAudit()
+    [city, "audit"],
+    () => api.cityAudit(city)
   );
 
   const blindSpots = data?.blind_spots ?? [];

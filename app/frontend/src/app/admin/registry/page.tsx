@@ -8,6 +8,7 @@
  * Falls back to showing what we can compute from attribution data.
  */
 import useSWR from "swr";
+import { useCity } from "@/lib/CityContext";
 import { api } from "@/lib/api";
 import type { Attribution } from "@/lib/types";
 import { SOURCE_LABELS } from "@/lib/constants";
@@ -105,9 +106,10 @@ function OffenderCard({ cluster }: { cluster: OffenderCluster }) {
 }
 
 export default function RegistryPage() {
+  const { city } = useCity();
   const { data: attributions, isLoading } = useSWR<Attribution[]>(
-    "attributions",
-    () => api.getAttributions()
+    [city, "attributions"],
+    () => api.cityAttributions(city)
   );
 
   const clusters = attributions ? buildClusters(attributions) : [];

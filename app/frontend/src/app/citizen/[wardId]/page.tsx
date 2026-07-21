@@ -9,6 +9,8 @@ import { useCity } from "@/lib/CityContext";
 import { AQI_ADVICE } from "@/lib/constants";
 import type { FusionResponse, ForecastCell } from "@/lib/types";
 
+import VoiceAdvisory from "@/components/citizen/VoiceAdvisory";
+
 const CitizenMap = dynamic(() => import("@/components/citizen/CitizenMap"), {
   ssr: false,
   loading: () => <div className="skeleton" style={{ height: 300, borderRadius: "var(--radius-lg)" }} />,
@@ -179,6 +181,9 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
           </p>
         </div>
       )}
+
+      {/* Spoken advisory — the IVR/voice-note deliverable, per language */}
+      <VoiceAdvisory city={city} wardId={wardId} />
 
       {/* 72-hour forecast — median predicted AQI across the ward's cells */}
       <div className="card" style={{ marginBottom: "var(--space-lg)" }}>

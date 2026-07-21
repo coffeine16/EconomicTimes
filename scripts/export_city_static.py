@@ -18,6 +18,7 @@ import pandas as pd  # noqa: E402
 from shared.config import CITY, DATA_OUT, DATA_RAW  # noqa: E402
 
 FE_DATA = Path(__file__).parent.parent / "app" / "frontend" / "public" / "data"
+FE_AUDIO = Path(__file__).parent.parent / "app" / "frontend" / "public" / "audio"
 
 # contracts the frontend fetches, copied as-is
 JSON_CONTRACTS = [
@@ -77,6 +78,24 @@ def _satellite_json() -> list:
     return [{"cell": c, "no2": round(float(v), 2)} for c, v in per.items()]
 
 
+def _export_audio() -> int:
+    """Ship this city's voice clips + manifest so the ward page can play them on a
+    static deploy (no backend). Ward ids repeat across cities, so audio MUST be
+    namespaced per city or Delhi's W002 would play for Chennai's W002."""
+    src = DATA_OUT / "audio"
+    if not src.exists():
+        return 0
+    dest = FE_AUDIO / CITY
+    dest.mkdir(parents=True, exist_ok=True)
+    for old in dest.glob("*"):        # keep it in sync, not accumulating
+        old.unlink()
+    n = 0
+    for p in list(src.glob("*.mp3")) + list(src.glob("manifest.json")):
+        shutil.copy2(p, dest / p.name)
+        n += 1
+    return n
+
+
 def main() -> None:
     dest = FE_DATA / CITY
     dest.mkdir(parents=True, exist_ok=True)
@@ -93,8 +112,10 @@ def main() -> None:
     (dest / "fires.json").write_text(json.dumps(_fires_json()), encoding="utf-8")
     (dest / "satellite.json").write_text(json.dumps(_satellite_json()), encoding="utf-8")
 
+    n_audio = _export_audio()
     print(f"[export] {CITY}: {n} contracts + fusion/stations/fires/satellite "
-          f"-> public/data/{CITY}/")
+          f"-> public/data/{CITY}/"
+          + (f"; {n_audio} audio files -> public/audio/{CITY}/" if n_audio else ""))
 
 
 if __name__ == "__main__":
