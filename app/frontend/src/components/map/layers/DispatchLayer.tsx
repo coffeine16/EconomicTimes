@@ -32,7 +32,14 @@ function teamColor(teamId: string): [number, number, number, number] {
 
 // Build stop-pair lines for each route (fallback when no road geometry)
 interface RouteLine { from: [number, number]; to: [number, number]; team_id: string }
-interface StopPoint { stop: DispatchStop; team_id: string; route_km: number; route_duration_min: number }
+interface StopPoint {
+  stop: DispatchStop;
+  team_id: string;
+  route_km: number;
+  route_duration_min: number;
+  /** This team has exactly one stop, so there is no route to draw — see below. */
+  solo: boolean;
+}
 interface RoadPath  { path: [number, number][]; team_id: string }
 
 export function buildDispatchLayers(
@@ -71,6 +78,12 @@ export function buildDispatchLayers(
         team_id: route.team_id,
         route_km: route.route_km,
         route_duration_min: route.route_duration_min ?? 0,
+        // A team with ONE stop has no path: nothing to route between, so
+        // route_km and route_geometry are legitimately 0/empty. Without a visual
+        // cue that reads as a broken route rather than a short assignment —
+        // which is exactly how Delhi looked, where 4 actions across 4 teams gave
+        // every team a single stop.
+        solo: route.stops.length === 1,
       });
     }
   }
@@ -112,6 +125,34 @@ export function buildDispatchLayers(
     );
   }
 
+  // Halo behind single-stop assignments.
+  //
+  // A one-stop team draws no line, so its pin sat on the map looking like a
+  // route that had failed to render. The ring says "this IS the whole
+  // assignment" — a destination, not a broken path. Drawn first so it sits
+  // under the pin.
+  const solos = points.filter((p) => p.solo);
+  if (solos.length) {
+    layers.push(
+      new ScatterplotLayer<StopPoint>({
+        id: "dispatch-solo-halo",
+        data: solos,
+        getPosition: (d) => [d.stop.lon, d.stop.lat],
+        getRadius: 620,
+        radiusMinPixels: 15,
+        radiusMaxPixels: 30,
+        filled: false,
+        stroked: true,
+        getLineColor: (d) => {
+          const [r, g, b] = teamColor(d.team_id);
+          return [r, g, b, 130];
+        },
+        lineWidthMinPixels: 1.5,
+        pickable: false,
+      })
+    );
+  }
+
   // Stop markers
   const stopLayer = new ScatterplotLayer<StopPoint>({
     id: "dispatch-stops",
@@ -129,7 +170,7 @@ export function buildDispatchLayers(
     highlightColor: [255, 255, 255, 80],
     onHover: (info) => {
       if (info.object) {
-        const { stop, team_id, route_km, route_duration_min } = info.object as StopPoint;
+        const { stop, team_id, route_km, route_duration_min, solo } = info.object as StopPoint;
         onHover({
           x: info.x,
           y: info.y,
@@ -158,8 +199,12 @@ export function buildDispatchLayers(
                     <span>{route_km} km</span>
                     {route_duration_min > 0 && <span>~{Math.round(route_duration_min)} min</span>}
                   </>
+                ) : solo ? (
+                  // Say WHY there is no route, rather than reporting 0 km as if
+                  // a measurement had failed.
+                  <span>Only stop for this team — no travel between sites</span>
                 ) : (
-                  <span>Single stop (0 km)</span>
+                  <span>Route distance unavailable</span>
                 )}
               </div>
             </div>
