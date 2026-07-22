@@ -167,8 +167,16 @@ export interface DispatchStop {
 export interface DispatchRoute {
   team_id: string;
   route_km: number;
+  route_duration_min: number;        // estimated travel time (from OSRM or fallback)
   coverage_pct: number;
   stops: DispatchStop[];
+  route_geometry: [number, number][]; // [lon, lat] pairs — actual road path from OSRM
+}
+
+/** Configuration passed to the prioritisation agent for dispatch routing. */
+export interface DispatchConfig {
+  n_teams: number;       // number of inspection teams (default 4)
+  stop_budget: number;   // max total stops across all teams (default 10)
 }
 
 // ─── Forecast ─────────────────────────────────────────────────────────────────

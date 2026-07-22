@@ -32,20 +32,20 @@ const N8N_WEBHOOK_URL =
 
 /** Map from API path to the fallback static file in /public/data/ */
 const FALLBACK_MAP: Record<string, string> = {
-  "/hotspots":        "/data/hotspots.json",
-  "/attributions":    "/data/attributions.json",
-  "/fusion":          "/data/fusion_field.json",
-  "/forecast":        "/data/forecast.json",
-  "/actions":         "/data/actions.json",
-  "/dispatch":        "/data/dispatch.json",
-  "/ledger":          "/data/ledger.json",
-  "/audit":           "/data/audit.json",
-  "/wards":           "/data/wards.json",
-  "/stations":        "/data/stations.json",
-  "/fires":           "/data/fires.json",
-  "/loso":            "/data/loso.json",
-  "/compare":         "/data/city_comparison.json",
-  "/satellite":       "/data/satellite.json",
+  "/hotspots": "/data/hotspots.json",
+  "/attributions": "/data/attributions.json",
+  "/fusion": "/data/fusion_field.json",
+  "/forecast": "/data/forecast.json",
+  "/actions": "/data/actions.json",
+  "/dispatch": "/data/dispatch.json",
+  "/ledger": "/data/ledger.json",
+  "/audit": "/data/audit.json",
+  "/wards": "/data/wards.json",
+  "/stations": "/data/stations.json",
+  "/fires": "/data/fires.json",
+  "/loso": "/data/loso.json",
+  "/compare": "/data/city_comparison.json",
+  "/satellite": "/data/satellite.json",
 };
 
 function getFallbackPath(endpoint: string): string | null {
@@ -117,6 +117,7 @@ import type {
   WardForecastPoint,
   Action,
   DispatchRoute,
+  DispatchConfig,
   CitizenReport,
   CreateReportPayload,
   PipelineRunResult,
@@ -129,15 +130,15 @@ import type { Station, FireDetection } from "@/hooks/useMapData";
 export const api = {
   // ─── City-scoped contracts (drive the multi-city map) ─────────────────────────
   // These read that city's static bundle so switching city needs no backend.
-  cityHotspots:   (city: string) => cityFetch<Hotspot[]>(city, "hotspots.json", []),
-  cityFusion:     (city: string) => cityFetch<FusionResponse>(city, "fusion_field.json", { ts: "", n_hours: 0, cells: [] }),
-  cityWards:      (city: string) => cityFetch<WardsResponse>(city, "wards.json", { synthetic: false, n_wards: 0, cells: [] } as unknown as WardsResponse),
-  cityStations:   (city: string) => cityFetch<Station[]>(city, "stations.json", []),
-  cityFires:      (city: string) => cityFetch<FireDetection[]>(city, "fires.json", []),
-  citySatellite:  (city: string) => cityFetch<{ cell: string; no2: number }[]>(city, "satellite.json", []),
-  cityAudit:      (city: string) => cityFetch<AuditResponse>(city, "audit.json", { blind_spots: [], sensor_flags: [], placement_recommendations: [] }),
-  cityDispatch:   (city: string) => cityFetch<DispatchRoute[]>(city, "dispatch.json", []),
-  cityActions:    (city: string) => cityFetch<Action[]>(city, "actions.json", []),
+  cityHotspots: (city: string) => cityFetch<Hotspot[]>(city, "hotspots.json", []),
+  cityFusion: (city: string) => cityFetch<FusionResponse>(city, "fusion_field.json", { ts: "", n_hours: 0, cells: [] }),
+  cityWards: (city: string) => cityFetch<WardsResponse>(city, "wards.json", { synthetic: false, n_wards: 0, cells: [] } as unknown as WardsResponse),
+  cityStations: (city: string) => cityFetch<Station[]>(city, "stations.json", []),
+  cityFires: (city: string) => cityFetch<FireDetection[]>(city, "fires.json", []),
+  citySatellite: (city: string) => cityFetch<{ cell: string; no2: number }[]>(city, "satellite.json", []),
+  cityAudit: (city: string) => cityFetch<AuditResponse>(city, "audit.json", { blind_spots: [], sensor_flags: [], placement_recommendations: [] }),
+  cityDispatch: (city: string) => cityFetch<DispatchRoute[]>(city, "dispatch.json", []),
+  cityActions: (city: string) => cityFetch<Action[]>(city, "actions.json", []),
   /** Ward-level 3-hourly forecast (24 lead times to +72h), for the citizen
    *  timeline. Ward-scale and medianed, so it is ~1% the size of the cell grid —
    *  the phone downloads kilobytes, not megabytes. */
@@ -145,11 +146,11 @@ export const api = {
     cityFetch<WardForecastPoint[]>(city, "forecast_ward.json", []),
 
   /** `h` is a lead time in hours: 3..72 in steps of 3 (was 24|48|72 only). */
-  cityForecast:   (city: string, h: number) =>
+  cityForecast: (city: string, h: number) =>
     cityFetch<ForecastCell[]>(city, "forecast.json", []).then((all) => all.filter((f) => f.horizon_h === h)),
   cityAttributions: (city: string) => cityFetch<Attribution[]>(city, "attributions.json", []),
-  cityMemos:      (city: string) => cityFetch<Memo[]>(city, "memos.json", []),
-  cityLedger:     (city: string) => cityFetch<Ledger | null>(city, "ledger.json", null),
+  cityMemos: (city: string) => cityFetch<Memo[]>(city, "memos.json", []),
+  cityLedger: (city: string) => cityFetch<Ledger | null>(city, "ledger.json", null),
   cityAdvisories: (city: string) => cityFetch<{ ward_id: string; texts?: Record<string, string> }[]>(city, "advisories.json", []),
 
   // ─── Map data (legacy, single-city via backend) ──────────────────────────────
@@ -202,14 +203,12 @@ export const api = {
     } as AuditResponse)),
 
   // ─── Agent pipeline ───────────────────────────────────────────────────────────
-  // `city` is not optional in spirit: the API serves whichever city it is asked
-  // for and defaults to its own. Running the agents for Delhi while the console
-  // displays Chennai would rewrite the wrong city's contracts, so pass it.
-  runAgent: async (agent: AgentName | "all", city?: string): Promise<PipelineRunResult> => {
-    const q = city ? `?city=${encodeURIComponent(city)}` : "";
-    return apiFetch<PipelineRunResult>(`/run/agent${q}`, {
+  runAgent: async (agent: AgentName | "all", dispatchConfig?: DispatchConfig): Promise<PipelineRunResult> => {
+    const body: Record<string, unknown> = { agent };
+    if (dispatchConfig) body.dispatch_config = dispatchConfig;
+    const res = await apiFetch<PipelineRunResult>("/run/agent", {
       method: "POST",
-      body: JSON.stringify({ agent }),
+      body: JSON.stringify(body),
     });
   },
 
@@ -245,7 +244,7 @@ export const api = {
   // ─── Citizen ─────────────────────────────────────────────────────────────────
   getWardSummary: (wardId: string) =>
     apiFetch<{ ward_id: string; ward_name: string; aqi: number; pm25: number; advisory?: string }>
-    (`/ward/${wardId}/summary`).catch(() => null),
+      (`/ward/${wardId}/summary`).catch(() => null),
 
   getReports: () =>
     apiFetch<CitizenReport[]>("/reports").catch(() => [] as CitizenReport[]),

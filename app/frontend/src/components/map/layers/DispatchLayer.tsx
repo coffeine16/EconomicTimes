@@ -1,10 +1,14 @@
 "use client";
 /**
  * DispatchLayer — draws per-team inspection routes on the map.
- * Each route is a polyline through stop centroids, colored by team.
- * Stop positions are rendered as pins with EPS labels.
+ *
+ * When the backend provides route_geometry (from OSRM), the route follows the
+ * actual road path using a PathLayer.  When route_geometry is absent or empty,
+ * it falls back to straight LineLayer segments between stop centroids.
+ *
+ * Stop positions are rendered as pins with sequence labels.
  */
-import { LineLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
+import { PathLayer, LineLayer, ScatterplotLayer, TextLayer } from "@deck.gl/layers";
 import { icon, Truck } from "@/components/Icon";
 import type { DispatchRoute, DispatchStop } from "@/lib/types";
 
@@ -26,9 +30,10 @@ function teamColor(teamId: string): [number, number, number, number] {
   return TEAM_COLORS[idx % TEAM_COLORS.length];
 }
 
-// Build stop-pair lines for each route
+// Build stop-pair lines for each route (fallback when no road geometry)
 interface RouteLine { from: [number, number]; to: [number, number]; team_id: string }
-interface StopPoint { stop: DispatchStop; team_id: string }
+interface StopPoint { stop: DispatchStop; team_id: string; route_km: number; route_duration_min: number }
+interface RoadPath  { path: [number, number][]; team_id: string }
 
 export function buildDispatchLayers(
   routes: DispatchRoute[],
@@ -36,34 +41,78 @@ export function buildDispatchLayers(
 ) {
   if (!routes.length) return [];
 
-  const lines: RouteLine[] = [];
+  const roadPaths: RoadPath[] = [];
+  const fallbackLines: RouteLine[] = [];
   const points: StopPoint[] = [];
 
   for (const route of routes) {
-    for (let i = 0; i < route.stops.length - 1; i++) {
-      lines.push({
-        from: [route.stops[i].lon, route.stops[i].lat],
-        to:   [route.stops[i + 1].lon, route.stops[i + 1].lat],
+    const hasGeometry = route.route_geometry && route.route_geometry.length > 1;
+
+    if (hasGeometry) {
+      // Use OSRM road geometry
+      roadPaths.push({
+        path: route.route_geometry as [number, number][],
         team_id: route.team_id,
       });
+    } else {
+      // Fallback: straight lines between consecutive stops
+      for (let i = 0; i < route.stops.length - 1; i++) {
+        fallbackLines.push({
+          from: [route.stops[i].lon, route.stops[i].lat],
+          to:   [route.stops[i + 1].lon, route.stops[i + 1].lat],
+          team_id: route.team_id,
+        });
+      }
     }
+
     for (const stop of route.stops) {
-      points.push({ stop, team_id: route.team_id });
+      points.push({
+        stop,
+        team_id: route.team_id,
+        route_km: route.route_km,
+        route_duration_min: route.route_duration_min ?? 0,
+      });
     }
   }
 
-  const lineLayer = new LineLayer<RouteLine>({
-    id: "dispatch-routes",
-    data: lines,
-    getSourcePosition: (d) => d.from,
-    getTargetPosition: (d) => d.to,
-    getColor: (d) => teamColor(d.team_id),
-    getWidth: 2,
-    widthMinPixels: 2,
-    widthMaxPixels: 5,
-    pickable: false,
-  });
+  const layers = [];
 
+  // Road-path layer (actual road geometry from OSRM)
+  if (roadPaths.length) {
+    layers.push(
+      new PathLayer<RoadPath>({
+        id: "dispatch-road-paths",
+        data: roadPaths,
+        getPath: (d) => d.path,
+        getColor: (d) => teamColor(d.team_id),
+        getWidth: 4,
+        widthMinPixels: 2,
+        widthMaxPixels: 8,
+        jointRounded: true,
+        capRounded: true,
+        pickable: false,
+      })
+    );
+  }
+
+  // Fallback straight-line layer
+  if (fallbackLines.length) {
+    layers.push(
+      new LineLayer<RouteLine>({
+        id: "dispatch-routes-fallback",
+        data: fallbackLines,
+        getSourcePosition: (d) => d.from,
+        getTargetPosition: (d) => d.to,
+        getColor: (d) => teamColor(d.team_id),
+        getWidth: 2,
+        widthMinPixels: 2,
+        widthMaxPixels: 5,
+        pickable: false,
+      })
+    );
+  }
+
+  // Stop markers
   const stopLayer = new ScatterplotLayer<StopPoint>({
     id: "dispatch-stops",
     data: points,
@@ -80,12 +129,12 @@ export function buildDispatchLayers(
     highlightColor: [255, 255, 255, 80],
     onHover: (info) => {
       if (info.object) {
-        const { stop, team_id } = info.object as StopPoint;
+        const { stop, team_id, route_km, route_duration_min } = info.object as StopPoint;
         onHover({
           x: info.x,
           y: info.y,
           content: (
-            <div style={{ minWidth: 180 }}>
+            <div style={{ minWidth: 200 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, marginBottom: 4 }}>
                 <Truck {...icon.sm} aria-hidden />
                 Dispatch stop #{stop.seq}
@@ -99,6 +148,20 @@ export function buildDispatchLayers(
               <div className="mono" style={{ fontSize: "0.8rem", color: "var(--caution)", marginTop: 4 }}>
                 EPS: {stop.eps.toFixed(1)}
               </div>
+              <div style={{
+                display: "flex", gap: 12, marginTop: 6, paddingTop: 6,
+                borderTop: "1px solid var(--border-subtle)",
+                fontSize: "0.74rem", color: "var(--text-tertiary)",
+              }}>
+                {route_km > 0 ? (
+                  <>
+                    <span>{route_km} km</span>
+                    {route_duration_min > 0 && <span>~{Math.round(route_duration_min)} min</span>}
+                  </>
+                ) : (
+                  <span>Single stop (0 km)</span>
+                )}
+              </div>
             </div>
           ),
         });
@@ -107,6 +170,7 @@ export function buildDispatchLayers(
     updateTriggers: { getFillColor: [routes] },
   });
 
+  // Sequence labels on each stop
   const labelLayer = new TextLayer<StopPoint>({
     id: "dispatch-labels",
     data: points,
@@ -122,5 +186,6 @@ export function buildDispatchLayers(
     getPixelOffset: [0, 0],
   });
 
-  return [lineLayer, stopLayer, labelLayer];
+  layers.push(stopLayer, labelLayer);
+  return layers;
 }

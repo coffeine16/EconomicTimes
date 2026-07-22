@@ -1,7 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import { api } from "@/lib/api";
-import type { AgentName, AgentState, PipelineRunResult } from "@/lib/types";
+import type { AgentName, AgentState, PipelineRunResult, DispatchConfig } from "@/lib/types";
 import { AGENT_ORDER } from "@/lib/constants";
 import { useCity } from "@/lib/CityContext";
 
@@ -22,7 +22,7 @@ export function useAgentRun(onComplete?: () => void) {
       prev.map((a) => (a.name === name ? { ...a, status, duration_ms } : a))
     );
 
-  const runAgent = useCallback(async (agent: AgentName | "all") => {
+  const runAgent = useCallback(async (agent: AgentName | "all", dispatchConfig?: DispatchConfig) => {
     setRunning(true);
     setError(null);
     // Optimistically mark target agents as running
@@ -32,7 +32,7 @@ export function useAgentRun(onComplete?: () => void) {
     ));
 
     try {
-      const result = await api.runAgent(agent, city);
+      const result = await api.runAgent(agent, dispatchConfig);
       setLastRun(result);
       // Update each agent status from result
       result.agents.forEach((a) => markAgent(a.name, a.status, a.duration_ms));

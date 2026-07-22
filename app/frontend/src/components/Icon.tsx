@@ -54,6 +54,7 @@ export {
   SatelliteDish,
   ScanLine,
   Search,
+  Settings,
   ShieldAlert,
   Siren,
   SlidersHorizontal,

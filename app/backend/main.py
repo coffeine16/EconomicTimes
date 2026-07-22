@@ -315,6 +315,9 @@ def run_agent(body: dict):
     useAgentRun.ts actually calls). Safe because the graph covers AGENTS ONLY —
     deterministic re-scoring of artifacts already on disk (~seconds). Ingestion,
     the panel and fusion/LOSO are unreachable from here by construction.
+
+    Optional `dispatch_config` in body: {n_teams: int, stop_budget: int} —
+    forwarded to the prioritisation agent.
     """
     from intelligence.orchestrator import AGENT_NAMES
     agent = (body or {}).get("agent", "all")
@@ -358,6 +361,8 @@ def run_agent(body: dict):
             tail = (proc.stderr or b"").decode(errors="replace")[-400:]
             raise HTTPException(500, f"agent run for {city} failed: {tail}")
         return json.loads(out.read_text(encoding="utf-8"))
+    dispatch_config = (body or {}).get("dispatch_config", None)
+    return run_chain(agent, dispatch_config=dispatch_config)
 
 
 @app.get("/ledger", dependencies=[Depends(city_param)])

@@ -9,19 +9,23 @@
  * "Run Full Pipeline" triggers the batch chain via the backend (POST /run/agent),
  * streaming per-agent status. With no backend (static deploy) the drawer is still
  * the architecture explainer — the flow, in order, with what each agent does.
+ *
+ * Dispatch config: n_teams and stop_budget are exposed as configurable inputs in
+ * the drawer header. They are passed through to the prioritisation agent.
  */
-import type { AgentState, AgentName } from "@/lib/types";
+import { useState } from "react";
+import type { AgentState, AgentName, DispatchConfig } from "@/lib/types";
 import { AGENT_LABELS, AGENT_DESCRIPTIONS, AGENT_ORDER, AGENT_ICONS } from "@/lib/constants";
-import { icon, X, Play, LoaderCircle, Check } from "@/components/Icon";
+import { icon, X, Play, LoaderCircle, Check, Truck, Settings } from "@/components/Icon";
 import useSWR from "swr";
 import { api } from "@/lib/api";
 import { useCity } from "@/lib/CityContext";
 
 const STATUS = {
-  idle:    { color: "var(--text-tertiary)", ring: "var(--border-default)", label: "" },
-  running: { color: "var(--accent)",        ring: "var(--accent)",         label: "running" },
-  done:    { color: "var(--positive)",      ring: "var(--positive-line)",  label: "done" },
-  error:   { color: "var(--critical)",      ring: "var(--critical-line)",  label: "failed" },
+  idle: { color: "var(--text-tertiary)", ring: "var(--border-default)", label: "" },
+  running: { color: "var(--accent)", ring: "var(--accent)", label: "running" },
+  done: { color: "var(--positive)", ring: "var(--positive-line)", label: "done" },
+  error: { color: "var(--critical)", ring: "var(--critical-line)", label: "failed" },
 } as const;
 
 export default function AgentPipelinePanel({
@@ -31,7 +35,7 @@ export default function AgentPipelinePanel({
   onClose: () => void;
   agents: AgentState[];
   running: boolean;
-  onRun: (agent: AgentName | "all") => void;
+  onRun: (agent: AgentName | "all", dispatchConfig?: DispatchConfig) => void;
   onReset: () => void;
 }) {
   const { city } = useCity();
@@ -49,6 +53,13 @@ export default function AgentPipelinePanel({
   const durOf = (n: AgentName) => agents.find((a) => a.name === n)?.duration_ms;
   const doneCount = agents.filter((a) => a.status === "done").length;
   const anyDone = agents.some((a) => a.status === "done" || a.status === "error");
+
+  // ── Dispatch configuration ────────────────────────────────────────────────
+  const [nTeams, setNTeams] = useState(4);
+  const [stopBudget, setStopBudget] = useState(10);
+  const [configOpen, setConfigOpen] = useState(false);
+
+  const dispatchConfig: DispatchConfig = { n_teams: nTeams, stop_budget: stopBudget };
 
   return (
     <>
@@ -101,10 +112,111 @@ export default function AgentPipelinePanel({
             <i style={{ width: `${(doneCount / AGENT_ORDER.length) * 100}%` }} />
           </div>
 
+          {/* ── Dispatch Config Toggle ─────────────────────────────────────── */}
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => setConfigOpen((o) => !o)}
+            aria-expanded={configOpen}
+            style={{
+              marginTop: "var(--space-sm)", width: "100%",
+              justifyContent: "space-between",
+              fontSize: "0.76rem",
+            }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Settings {...icon.sm} aria-hidden />
+              Dispatch config
+            </span>
+            <span className="mono" style={{ fontSize: "0.7rem", color: "var(--text-tertiary)" }}>
+              {nTeams} teams · {stopBudget} stops
+            </span>
+          </button>
+
+          {/* ── Dispatch Config Panel (collapsible) ────────────────────────── */}
+          {configOpen && (
+            <div style={{
+              marginTop: "var(--space-sm)",
+              padding: "var(--space-sm) var(--space-md)",
+              background: "var(--bg-secondary)",
+              borderRadius: "var(--radius-md)",
+              display: "flex", flexDirection: "column", gap: "var(--space-sm)",
+              border: "1px solid var(--border-subtle)",
+            }}>
+              {/* Number of teams */}
+              <div>
+                <label
+                  htmlFor="dispatch-n-teams"
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    fontSize: "0.74rem", color: "var(--text-secondary)", marginBottom: 4,
+                  }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                    <Truck {...icon.sm} aria-hidden />
+                    Inspection teams
+                  </span>
+                  <span className="mono" style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-primary)", minWidth: 20, textAlign: "right" }}>
+                    {nTeams}
+                  </span>
+                </label>
+                <input
+                  id="dispatch-n-teams"
+                  type="range"
+                  min={1} max={8} step={1}
+                  value={nTeams}
+                  onChange={(e) => setNTeams(Number(e.target.value))}
+                  disabled={running}
+                  style={{ width: "100%", accentColor: "var(--accent)" }}
+                />
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: 2,
+                }}>
+                  <span>1</span><span>8</span>
+                </div>
+              </div>
+
+              {/* Stop budget */}
+              <div>
+                <label
+                  htmlFor="dispatch-stop-budget"
+                  style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    fontSize: "0.74rem", color: "var(--text-secondary)", marginBottom: 4,
+                  }}
+                >
+                  <span>Max stops (total)</span>
+                  <span className="mono" style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--text-primary)", minWidth: 20, textAlign: "right" }}>
+                    {stopBudget}
+                  </span>
+                </label>
+                <input
+                  id="dispatch-stop-budget"
+                  type="range"
+                  min={2} max={20} step={1}
+                  value={stopBudget}
+                  onChange={(e) => setStopBudget(Number(e.target.value))}
+                  disabled={running}
+                  style={{ width: "100%", accentColor: "var(--accent)" }}
+                />
+                <div style={{
+                  display: "flex", justifyContent: "space-between",
+                  fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: 2,
+                }}>
+                  <span>2</span><span>20</span>
+                </div>
+              </div>
+
+              <div style={{ fontSize: "0.66rem", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+                Teams are assigned spatially-clustered zones. Stops are routed via OSRM for real road distance & time.
+              </div>
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: "var(--space-sm)", marginTop: "var(--space-md)" }}>
             <button
               className="btn btn-primary btn-sm"
-              onClick={() => onRun("all")}
+              onClick={() => onRun("all", dispatchConfig)}
               disabled={running}
               style={{ flex: 1 }}
             >
@@ -183,7 +295,7 @@ export default function AgentPipelinePanel({
 
                 {/* Content — tappable to run just this agent */}
                 <button
-                  onClick={() => onRun(name)}
+                  onClick={() => onRun(name, dispatchConfig)}
                   disabled={running}
                   style={{
                     flex: 1, textAlign: "left", background: "transparent", border: "none",

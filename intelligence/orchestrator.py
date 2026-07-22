@@ -57,9 +57,10 @@ def _forecast():
     from intelligence.models.forecast import run
     run()
 
-def _prioritisation():
+def _prioritisation(dispatch_config: dict | None = None):
     from intelligence.agents.prioritise import run
-    run()
+    cfg = dispatch_config or {}
+    run(n_teams=cfg.get("n_teams", 4), stop_budget=cfg.get("stop_budget", 10))
 
 def _memo():
     from intelligence.agents.memo import run
@@ -89,11 +90,14 @@ def _audit():
 
 # Order is THE definition of the chain. voice runs after advisory (it reads the
 # advisory text); audit closes the run (it reads the fusion field + stations).
+# prioritisation is special: it is the only agent that accepts runtime config
+# (n_teams, stop_budget). Its entry in AGENT_CHAIN uses a sentinel None —
+# _make_node patches the config in at call time.
 AGENT_CHAIN: list[tuple[str, callable]] = [
     ("detection", _detection),
     ("attribution", _attribution),
     ("forecast", _forecast),
-    ("prioritisation", _prioritisation),
+    ("prioritisation", None),  # patched with dispatch_config at run time
     ("memo", _memo),
     ("advisory", _advisory),
     ("voice", _voice),
@@ -141,19 +145,29 @@ def _build_langgraph(chain):
     return g.compile()
 
 
-def run_chain(only: str | None = None) -> dict:
+def run_chain(only: str | None = None, dispatch_config: dict | None = None) -> dict:
     """Execute the agent chain (or one agent) and return the PipelineRunResult.
 
     `only` is a frontend AgentName; a single-agent run executes just that node
     against the artifacts already on disk (its upstream inputs are batch outputs,
     so this is exactly the "re-run one stage" workflow).
+
+    `dispatch_config` is optional {n_teams, stop_budget} passed through to the
+    prioritisation agent.  Other agents ignore it.
     """
+    # Patch the prioritisation callable with the supplied config
+    prio_fn = lambda: _prioritisation(dispatch_config)
+    chain_with_config = [
+        (n, prio_fn if n == "prioritisation" else f)
+        for n, f in AGENT_CHAIN
+    ]
+
     if only and only != "all":
         if only not in AGENT_NAMES:
             raise ValueError(f"unknown agent {only!r}; choose from {AGENT_NAMES} or 'all'")
-        chain = [(n, f) for n, f in AGENT_CHAIN if n == only]
+        chain = [(n, f) for n, f in chain_with_config if n == only]
     else:
-        chain = AGENT_CHAIN
+        chain = chain_with_config
 
     started = datetime.now(timezone.utc)
     state: AirQualityState = {"results": []}
