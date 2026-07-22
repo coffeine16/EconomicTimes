@@ -11,7 +11,10 @@
  *    but are EXCLUDED here — there is nobody to serve a notice on.
  * 3. EPS is zone-level: severity = max across zone's cells,
  *    attribution_conf = max over zone's cells.
- * 4. forecast_delta = 0 (forecast agent not yet built).
+ * 4. forecast_delta = 0. The forecast agent IS built and runs — 3-hourly to
+ *    +72h — but its output is deliberately not yet wired into the EPS severity
+ *    term (FORECAST_WEIGHT = 0.0 in prioritise.py). A zero we can explain beats
+ *    a weight we have not validated.
  *    FORECAST_WEIGHT = 0.0 — a zero we can explain beats a number we invented.
  */
 import { useState, useMemo } from "react";
@@ -142,7 +145,7 @@ function EPSBreakdown({ components, eps }: { components: Record<string, number>;
         );
       })}
       <div style={{ fontSize: "0.65rem", color: "var(--text-tertiary)", marginTop: 2 }}>
-        forecast_delta = 0 — forecast agent not yet built
+        forecast_delta = 0 — forecast not yet fed into EPS
       </div>
     </div>
   );
