@@ -1,0 +1,40 @@
+# What `gcloud run deploy --source .` uploads to Cloud Build.
+#
+# ⚠️ THIS FILE IS LOAD-BEARING. Without it, gcloud falls back to .gitignore —
+# which excludes data/outputs/ and data/raw/*.parquet. The build would succeed,
+# the container would start, and every endpoint would 404 because the precomputed
+# artifacts the agents read were never uploaded. A silent, confusing failure.
+#
+# So: mirror .dockerignore, and say nothing about data/ (i.e. DO ship it).
+
+# Frontend — deployed separately to Vercel
+app/frontend/
+
+# Eval-only ground truth (46 MB). Serving never reads it.
+data/raw/truth.parquet
+
+# Local convenience, not runtime data
+data/outputs_snapshots/
+data/outputs/audio/
+
+# Repo furniture
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+docs/
+.vscode/
+.mcp.json
+
+# Secrets must never reach a build context
+.env
+secrets/
+*-service-account.json
+*.pem
+*.tfstate*
+.terraform/

@@ -1,0 +1,38 @@
+# Keep the serving image small. The agents need the panel + fusion field and a
+# few small raw tables; nothing else in the repo belongs in a serving container.
+
+# Frontend — deployed separately to Vercel
+app/frontend/
+
+# Eval-only ground truth (46 MB). Serving never reads it; only the synthetic
+# scorers do, and those run offline.
+data/raw/truth.parquet
+
+# Per-city snapshots and run logs — a local convenience, not runtime data
+data/outputs_snapshots/
+
+# Generated voice clips are served by the frontend from public/audio/, not here
+data/outputs/audio/
+
+# Repo furniture
+.git/
+.github/
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+docs/
+deploy/
+.vscode/
+.mcp.json
+
+# Secrets must never enter an image
+.env
+secrets/
+*-service-account.json
+*.pem
+*.tfstate*
+.terraform/
