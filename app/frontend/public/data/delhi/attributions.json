@@ -12,14 +12,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -117,7 +113,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -133,14 +129,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -238,7 +230,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -254,14 +246,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -359,7 +347,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -375,14 +363,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -480,7 +464,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -496,14 +480,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -601,7 +581,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -617,14 +597,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -722,7 +698,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -738,14 +714,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -843,7 +815,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -859,14 +831,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -964,7 +932,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -980,14 +948,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -1085,7 +1049,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -1101,14 +1065,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -1206,7 +1166,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -1222,14 +1182,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -1327,7 +1283,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -1343,14 +1299,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -1448,7 +1400,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -1464,14 +1416,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -1569,7 +1517,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -1585,14 +1533,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -1690,7 +1634,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {
@@ -1706,14 +1650,10 @@
       "waste_burning": 0.0,
       "traffic": 0.798
     },
-    "reason": "Traffic is the most likely primary source of this PM2.5 hotspot, as indicated by its highest deterministic category score of 0.798. This is further supported by the landuse context showing 7 traffic areas and the presence of multiple traffic candidate sources, some with high wind alignment (e.g., traffic_1429639987 at 0.77). The pollutant signature with elevated NO2 (67th percentile) and AAI (67th percentile) is consistent with vehicular emissions, and trapped air conditions likely contribute to the high PM2.5 estimate.",
+    "reason": "Deterministic evidence scoring points to traffic as the primary source. traffic_25524703 is 1.31 km away, wind alignment 0.67; shallow boundary layer (130 m) trapping emissions.",
     "evidence_factors": [
-      "Highest traffic category score (0.798)",
-      "High traffic landuse context (7)",
-      "Multiple traffic candidate sources",
-      "Favorable wind alignment to traffic sources (e.g., 0.77)",
-      "Elevated NO2 (67th percentile) and AAI (67th percentile)",
-      "Trapped air conditions"
+      "traffic_25524703 is 1.31 km away, wind alignment 0.67",
+      "shallow boundary layer (130 m) trapping emissions"
     ],
     "evidence": {
       "cell": "883da111dbfffff",
@@ -1811,7 +1751,7 @@
       "evidence_window_hours": 720,
       "zone_cells": 15
     },
-    "explained_by": "gemini",
+    "explained_by": "rules",
     "zone_id": "Z05"
   },
   {

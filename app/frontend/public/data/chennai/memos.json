@@ -5,7 +5,7 @@
     "zone_id": "Z02",
     "ward_id": "W006",
     "ward_name": "Ward 37 (Tondiarpet)",
-    "issued_at": "2026-07-22T13:17:40.782207+00:00",
+    "issued_at": "2026-07-22T14:10:37.819627+00:00",
     "status": "draft",
     "situation": {
       "source": "industrial",
@@ -149,7 +149,7 @@
     "zone_id": "Z10",
     "ward_id": "W018",
     "ward_name": "Ward 19 (Manali)",
-    "issued_at": "2026-07-22T13:17:41.427152+00:00",
+    "issued_at": "2026-07-22T14:10:37.819686+00:00",
     "status": "draft",
     "situation": {
       "source": "industrial",
@@ -293,7 +293,7 @@
     "zone_id": "Z07",
     "ward_id": "W014",
     "ward_name": "Ward 157 (Alandur)",
-    "issued_at": "2026-07-22T13:17:41.934642+00:00",
+    "issued_at": "2026-07-22T14:10:37.819724+00:00",
     "status": "draft",
     "situation": {
       "source": "industrial",
@@ -437,7 +437,7 @@
     "zone_id": "Z05",
     "ward_id": "W168",
     "ward_name": "Ward 156 (Alandur)",
-    "issued_at": "2026-07-22T13:17:42.615936+00:00",
+    "issued_at": "2026-07-22T14:10:37.819756+00:00",
     "status": "draft",
     "situation": {
       "source": "traffic",
@@ -573,7 +573,7 @@
     "zone_id": "Z00",
     "ward_id": "W102",
     "ward_name": "Ward 106 (Annanagar)",
-    "issued_at": "2026-07-22T13:17:43.261114+00:00",
+    "issued_at": "2026-07-22T14:10:37.819788+00:00",
     "status": "draft",
     "situation": {
       "source": "construction",
@@ -717,7 +717,7 @@
     "zone_id": "Z01",
     "ward_id": "W100",
     "ward_name": "Ward 102 (Annanagar)",
-    "issued_at": "2026-07-22T13:17:43.884026+00:00",
+    "issued_at": "2026-07-22T14:10:37.819818+00:00",
     "status": "draft",
     "situation": {
       "source": "industrial",
@@ -861,7 +861,7 @@
     "zone_id": "Z04",
     "ward_id": "W175",
     "ward_name": "Ward 150 (Valasaravakkam)",
-    "issued_at": "2026-07-22T13:17:44.193956+00:00",
+    "issued_at": "2026-07-22T14:10:37.819845+00:00",
     "status": "draft",
     "situation": {
       "source": "industrial",
@@ -1005,7 +1005,7 @@
     "zone_id": "Z06",
     "ward_id": "unassigned",
     "ward_name": "Outside city limits",
-    "issued_at": "2026-07-22T13:17:44.484653+00:00",
+    "issued_at": "2026-07-22T14:10:37.819873+00:00",
     "status": "draft",
     "situation": {
       "source": "construction",
@@ -1149,7 +1149,7 @@
     "zone_id": "Z09",
     "ward_id": "unassigned",
     "ward_name": "Outside city limits",
-    "issued_at": "2026-07-22T13:17:45.168182+00:00",
+    "issued_at": "2026-07-22T14:10:37.819898+00:00",
     "status": "draft",
     "situation": {
       "source": "traffic",
@@ -1285,7 +1285,7 @@
     "zone_id": "Z08",
     "ward_id": "W167",
     "ward_name": "Ward 159 (Alandur)",
-    "issued_at": "2026-07-22T13:17:45.806639+00:00",
+    "issued_at": "2026-07-22T14:10:37.819925+00:00",
     "status": "draft",
     "situation": {
       "source": "industrial",

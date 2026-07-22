@@ -155,6 +155,12 @@ def run_chain(only: str | None = None, dispatch_config: dict | None = None) -> d
     `dispatch_config` is optional {n_teams, stop_budget} passed through to the
     prioritisation agent.  Other agents ignore it.
     """
+    # Clear any LLM circuit that tripped in a PREVIOUS run. The breaker exists to
+    # stop one dead credential costing hundreds of round-trips WITHIN a run; in a
+    # long-lived server it must not disable the LLM until the process restarts.
+    from intelligence.agents.llm_gateway import reset_circuits
+    reset_circuits()
+
     # Patch the prioritisation callable with the supplied config
     prio_fn = lambda: _prioritisation(dispatch_config)
     chain_with_config = [

@@ -239,16 +239,33 @@ def _forecast_field(panel: pd.DataFrame, fusion: pd.DataFrame) -> list[dict]:
     cols = _feature_cols(train)
     model = lgb.train(PARAMS, lgb.Dataset(train[cols], label=train.y), num_boost_round=400)
 
+    # Build the feature frame ONCE, not once per horizon.
+    #
+    # _supervised walks the whole 1.7M-row panel to compute lags and rolling
+    # medians, and we then keep only the final hour. Calling it per horizon was
+    # tolerable at 3 horizons and became the entire cost at 24 — 88 s of a 101 s
+    # run, which is what killed the request on Cloud Run.
+    #
+    # Only three columns actually depend on the horizon: target_hour, target_dow
+    # and horizon itself. Everything else is "what is known at time T", which is
+    # identical for every lead. So compute the base once and vary those three.
+    #
+    # value_col="value" directly — series already carries a pm25_station column
+    # from the station merge, so renaming value->pm25_station would duplicate it
+    # and groupby[col] would return a 2D frame. Feature NAMES (lag_0, ...) do not
+    # depend on the value column, so train/predict columns still line up.
+    base = _supervised(series, "value", HORIZONS[0], require_target=False)
+    base = base[base.ts == at]
+    if base.empty:
+        return []
+
     out = []
     for h in HORIZONS:
-        # value_col="value" directly — series already carries a pm25_station column
-        # from the station merge, so renaming value->pm25_station would duplicate it
-        # and groupby[col] would return a 2D frame. Feature NAMES (lag_0, ...) do not
-        # depend on the value column, so train/predict columns still line up.
-        latest = _supervised(series, "value", h, require_target=False)
-        latest = latest[latest.ts == at]
-        if latest.empty:
-            continue
+        latest = base.copy()
+        tgt = latest["ts"] + pd.Timedelta(hours=h)
+        latest["target_hour"] = tgt.dt.hour
+        latest["target_dow"] = tgt.dt.dayofweek
+        latest["horizon"] = h
         pred = model.predict(latest[cols])
         for cell, yhat in zip(latest.cell, pred):
             cur = float(now.get(cell, np.nan))
@@ -286,9 +303,22 @@ def _ward_series(field: list[dict]) -> list[dict]:
             for r in g.itertuples()]
 
 
-def run(panel_path=None):
+# The oracle doubles the work of a forecast run: a second full training across
+# all 24 horizons. That is fine offline and NOT fine inside an HTTP request —
+# on Cloud Run's 2 vCPU it pushed /run/agent past the request budget and the
+# container was killed mid-chain, surfacing in the browser as a bare 503.
+#
+# It is a research measurement, not a product output: it answered "is an
+# Open-Meteo met forecast worth wiring up" (no) and the answer does not change
+# per run. So it is opt-in, and the batch pipeline is the only caller that opts.
+RUN_ORACLE_DEFAULT = False
+
+
+def run(panel_path=None, oracle: bool | None = None):
     panel = pd.read_parquet(panel_path or (DATA_OUT / "panel.parquet"))
     panel["ts"] = pd.to_datetime(panel.ts, utc=True)
+
+    want_oracle = RUN_ORACLE_DEFAULT if oracle is None else oracle
 
     print("[forecast] evaluating vs persistence + diurnal baselines (time-held-out) ...")
     ev = evaluate(panel)
@@ -296,9 +326,21 @@ def run(panel_path=None):
     # Oracle: the same model with the OBSERVED met at T+h. Leakage on purpose —
     # it is not a result, it is a measurement of how much a real met forecast
     # could be worth, so we can decide whether to build that plumbing.
-    print("[forecast] oracle run (observed met at target time) to size the met-forecast prize ...")
-    oracle = evaluate(panel, oracle_met=True)
+    oracle_res = {}
+    if want_oracle:
+        print("[forecast] oracle run (observed met at target time) to size the met-forecast prize ...")
+        oracle_res = evaluate(panel, oracle_met=True)
+    else:
+        # Keep whatever a previous offline oracle run measured, so the number
+        # stays on the Validation page instead of vanishing on the next live run.
+        prev = DATA_OUT / "forecast_eval.json"
+        if prev.exists():
+            try:
+                oracle_res = json.loads(prev.read_text(encoding="utf-8")).get("_oracle_met", {})
+            except Exception:  # noqa: BLE001 — a stale file must not kill the run
+                oracle_res = {}
 
+    oracle = oracle_res
     payload = {**ev, "_oracle_met": oracle,
                "_note": ("_oracle_met feeds the OBSERVED meteorology at the target "
                          "hour. That is deliberate leakage and is NOT a result: it "
