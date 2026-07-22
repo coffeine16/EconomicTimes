@@ -1,19 +1,16 @@
-<h1 align="center">AirCase</h1>
-
 <p align="center">
-  <strong>Every hotspot becomes a case file.</strong><br/>
-  <em>From AQI dashboards to enforcement dispatch — signal → attribution → action.</em>
+  <img src="assets/banner.svg" alt="AirCase Banner" width="100%" />
 </p>
 
 <p align="center">
-  <img alt="status" src="https://img.shields.io/badge/status-hackathon%20prototype-a9760a?style=flat-square" />
-  <img alt="python" src="https://img.shields.io/badge/python-3.11-0f6b3f?style=flat-square" />
-  <img alt="models" src="https://img.shields.io/badge/models-LightGBM%20%2B%20robust%20stats-0f6b3f?style=flat-square" />
-  <img alt="spatial" src="https://img.shields.io/badge/spatial-H3%20res--8-0f6b3f?style=flat-square" />
-  <img alt="agents" src="https://img.shields.io/badge/agents-7--node%20LangGraph-0f6b3f?style=flat-square" />
-  <img alt="serving" src="https://img.shields.io/badge/serving-FastAPI%20%2B%20n8n%20channels-0f6b3f?style=flat-square" />
-  <img alt="data" src="https://img.shields.io/badge/data-Sentinel--5P%20%2F%20FIRMS%20%2F%20OpenAQ-a9760a?style=flat-square" />
-  <img alt="llm" src="https://img.shields.io/badge/LLM-explains%2C%20never%20ranks-a9760a?style=flat-square" />
+  <img alt="status" src="https://img.shields.io/badge/status-hackathon%20prototype-43C6F9?style=flat-square" />
+  <img alt="python" src="https://img.shields.io/badge/python-3.11-134C87?style=flat-square" />
+  <img alt="models" src="https://img.shields.io/badge/models-LightGBM%20%2B%20robust%20stats-134C87?style=flat-square" />
+  <img alt="spatial" src="https://img.shields.io/badge/spatial-H3%20res--8-134C87?style=flat-square" />
+  <img alt="agents" src="https://img.shields.io/badge/agents-9--node%20LangGraph-134C87?style=flat-square" />
+  <img alt="serving" src="https://img.shields.io/badge/serving-FastAPI%20%2B%20n8n%20channels-134C87?style=flat-square" />
+  <img alt="data" src="https://img.shields.io/badge/data-Sentinel--5P%20%2F%20FIRMS%20%2F%20OpenAQ-43C6F9?style=flat-square" />
+  <img alt="llm" src="https://img.shields.io/badge/LLM-explains%2C%20never%20ranks-43C6F9?style=flat-square" />
 </p>
 
 **An air quality platform that names *who* is polluting, *where*, with *what
@@ -437,6 +434,25 @@ per-language verification labels.
 - [ ] **Live satellite needs GEE auth on the run machine** — the collector is done; `gcloud auth application-default login` (see `docs/gcp-setup.md`) is the one manual step. Until then, synthetic mode runs fully offline.
 - [ ] Sentinel-2 optical change detection → close the construction blind spot (S5P never will)
 - [ ] Kannada advisory text is `cross_checked`, not native-verified — ten minutes with a Kannada speaker upgrades it
+
+---
+
+## Contributors
+
+<p align="center">
+  <img alt="shyam" src="https://img.shields.io/badge/Shyam-Backend%20%2B%20Frontend-0f6b3f?style=flat-square" />
+  <img alt="keshav" src="https://img.shields.io/badge/Keshav-Backend%20%2B%20Frontend%20%2B%20Agents-0f6b3f?style=flat-square" />
+  <img alt="suyash" src="https://img.shields.io/badge/Suyash-EPS%20%2B%20Deployment-a9760a?style=flat-square" />
+  <img alt="saumya" src="https://img.shields.io/badge/Saumya%20Saraswat-Intelligence%20%2B%20Frontend%20Inputs-a9760a?style=flat-square" />
+</p>
+
+| Contributor | Focus areas |
+|---|---|
+| **Saumya Saraswat** | Intelligence, with inputs on Frontend |
+| **Suyash Mittal** | EPS, Deployment |
+| **Keshav Agarwal** | Backend, Frontend, Agents |
+| **Shyamsundar Paramasivam** | Backend, Frontend |
+
 
 ---
 
