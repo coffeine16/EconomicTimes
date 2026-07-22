@@ -29,6 +29,42 @@ TABLES = {
 }
 
 
+def _canonicalise_ward_names(reports: list[dict]) -> int:
+    """Turn a ward NAME into a ward ID.
+
+    The channel layer and the pipeline disagreed about what `ward_id` means. n8n
+    validates what a citizen types against the official ward list and stores what
+    it matched — a NAME, e.g. "BHALSWA". Attribution matches strictly on the
+    pipeline's ward ID, e.g. "W218". They never compared equal, so every report
+    that arrived by name (as every Telegram text report does) was silently
+    dropped from evidence: the citizen tier was wired end to end and contributed
+    to nothing.
+
+    Resolve here rather than in the matcher, so the file the pipeline reads has
+    ONE meaning for the field instead of two.
+    """
+    wards_p = DATA_OUT / "wards.json"
+    if not wards_p.exists():
+        return 0
+    try:
+        cells = json.loads(wards_p.read_text(encoding="utf-8"))["cells"]
+    except Exception:  # noqa: BLE001 — never let this break the sync
+        return 0
+    by_name = {c["ward_name"].strip().upper(): c["ward_id"] for c in cells}
+    known_ids = {c["ward_id"] for c in cells}
+
+    fixed = 0
+    for r in reports:
+        wid = (r.get("ward_id") or "").strip()
+        if not wid or wid in known_ids:
+            continue
+        resolved = by_name.get(wid.upper())
+        if resolved:
+            r["ward_id"] = resolved
+            fixed += 1
+    return fixed
+
+
 def _resolve_wards_from_location(reports: list[dict]) -> int:
     """Give a ward to reports that only carry coordinates.
 
@@ -89,9 +125,15 @@ def main() -> None:
             continue
         note = ""
         if table == "citizen_reports":
+            # Name -> id FIRST: a report that already names its ward needs no
+            # coordinates, and the location fallback only looks at rows still
+            # lacking a ward.
+            named = _canonicalise_ward_names(rows)
             fixed = _resolve_wards_from_location(rows)
-            if fixed:
-                note = f" ({fixed} located by coordinates)"
+            bits = [f"{named} by ward name" if named else "",
+                    f"{fixed} located by coordinates" if fixed else ""]
+            bits = [b for b in bits if b]
+            note = f" ({', '.join(bits)})" if bits else ""
         (DATA_OUT / fname).write_text(json.dumps(rows, indent=1, default=str),
                                       encoding="utf-8")
         print(f"[supabase] {table}: {len(rows)} rows -> data/outputs/{fname}{note}")
