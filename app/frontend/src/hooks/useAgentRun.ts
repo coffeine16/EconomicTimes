@@ -32,7 +32,7 @@ export function useAgentRun(onComplete?: () => void) {
     ));
 
     try {
-      const result = await api.runAgent(agent, dispatchConfig);
+      const result = await api.runAgent(agent, city, dispatchConfig);
       setLastRun(result);
       // Update each agent status from result
       result.agents.forEach((a) => markAgent(a.name, a.status, a.duration_ms));

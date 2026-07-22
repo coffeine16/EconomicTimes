@@ -65,7 +65,32 @@ function getFallbackPath(endpoint: string): string | null {
  * Delhi's hotspots under a Chennai label. An empty layer is a visible absence;
  * the wrong city's layer is an invisible lie.
  */
-export async function cityFetch<T>(city: string, file: string, fallback: T): Promise<T> {
+export async function cityFetch<T>(
+  city: string,
+  file: string,
+  fallback: T,
+  /** API path serving the SAME contract live, e.g. "/dispatch". Omit for
+   *  contracts that only exist as static files. */
+  live?: string,
+): Promise<T> {
+  // Prefer the live API when a backend is configured AND this contract has an
+  // endpoint. Without this the console could never show the result of its own
+  // work: the agents write to the container's disk, while the map read the
+  // static bundle baked into the frontend build at deploy time. A run went
+  // green, the data genuinely changed on the server, and the map redrew the
+  // identical file — which is exactly how "I changed the team count and nothing
+  // happened" looked.
+  if (HAS_BACKEND && live) {
+    try {
+      const res = await fetch(`${API_BASE}${live}?city=${encodeURIComponent(city)}`, {
+        next: { revalidate: 0 },
+      });
+      if (res.ok) return (await res.json()) as T;
+      // A 404 means this city has no pipeline output on the server; the static
+      // bundle below may still have it, so fall through rather than fail.
+    } catch { /* backend unreachable — the static bundle is the whole point */ }
+  }
+
   try {
     const res = await fetch(`/data/${city}/${file}`, { next: { revalidate: 0 } });
     if (res.ok) return (await res.json()) as T;
@@ -130,15 +155,15 @@ import type { Station, FireDetection } from "@/hooks/useMapData";
 export const api = {
   // ─── City-scoped contracts (drive the multi-city map) ─────────────────────────
   // These read that city's static bundle so switching city needs no backend.
-  cityHotspots: (city: string) => cityFetch<Hotspot[]>(city, "hotspots.json", []),
+  cityHotspots: (city: string) => cityFetch<Hotspot[]>(city, "hotspots.json", [], "/hotspots"),
   cityFusion: (city: string) => cityFetch<FusionResponse>(city, "fusion_field.json", { ts: "", n_hours: 0, cells: [] }),
   cityWards: (city: string) => cityFetch<WardsResponse>(city, "wards.json", { synthetic: false, n_wards: 0, cells: [] } as unknown as WardsResponse),
   cityStations: (city: string) => cityFetch<Station[]>(city, "stations.json", []),
   cityFires: (city: string) => cityFetch<FireDetection[]>(city, "fires.json", []),
   citySatellite: (city: string) => cityFetch<{ cell: string; no2: number }[]>(city, "satellite.json", []),
-  cityAudit: (city: string) => cityFetch<AuditResponse>(city, "audit.json", { blind_spots: [], sensor_flags: [], placement_recommendations: [] }),
-  cityDispatch: (city: string) => cityFetch<DispatchRoute[]>(city, "dispatch.json", []),
-  cityActions: (city: string) => cityFetch<Action[]>(city, "actions.json", []),
+  cityAudit: (city: string) => cityFetch<AuditResponse>(city, "audit.json", { blind_spots: [], sensor_flags: [], placement_recommendations: [] }, "/audit"),
+  cityDispatch: (city: string) => cityFetch<DispatchRoute[]>(city, "dispatch.json", [], "/dispatch"),
+  cityActions: (city: string) => cityFetch<Action[]>(city, "actions.json", [], "/actions"),
   /** Ward-level 3-hourly forecast (24 lead times to +72h), for the citizen
    *  timeline. Ward-scale and medianed, so it is ~1% the size of the cell grid —
    *  the phone downloads kilobytes, not megabytes. */
@@ -148,8 +173,13 @@ export const api = {
   /** `h` is a lead time in hours: 3..72 in steps of 3 (was 24|48|72 only). */
   cityForecast: (city: string, h: number) =>
     cityFetch<ForecastCell[]>(city, "forecast.json", []).then((all) => all.filter((f) => f.horizon_h === h)),
+  // NO live path on purpose: GET /attributions returns a SUMMARY subset (cell,
+  // ward_id, ts, primary_source, confidence, reason) and drops evidence, scores,
+  // zone_id and evidence_factors — which the evidence chain and the citizen
+  // "why your air is like this" panel both read. The static bundle carries the
+  // full record. Wiring this to the API would silently empty those panels.
   cityAttributions: (city: string) => cityFetch<Attribution[]>(city, "attributions.json", []),
-  cityMemos: (city: string) => cityFetch<Memo[]>(city, "memos.json", []),
+  cityMemos: (city: string) => cityFetch<Memo[]>(city, "memos.json", [], "/memos"),
   cityLedger: (city: string) => cityFetch<Ledger | null>(city, "ledger.json", null),
   cityAdvisories: (city: string) => cityFetch<{ ward_id: string; texts?: Record<string, string> }[]>(city, "advisories.json", []),
 
@@ -203,10 +233,20 @@ export const api = {
     } as AuditResponse)),
 
   // ─── Agent pipeline ───────────────────────────────────────────────────────────
-  runAgent: async (agent: AgentName | "all", dispatchConfig?: DispatchConfig): Promise<PipelineRunResult> => {
+  runAgent: async (
+    agent: AgentName | "all",
+    city?: string,
+    dispatchConfig?: DispatchConfig,
+  ): Promise<PipelineRunResult> => {
+    // `city` is not optional in spirit. The API serves whichever city it is asked
+    // for and falls back to its own default — so a run without it always targets
+    // the DEFAULT city. This parameter was lost once already, and the failure is
+    // silent and destructive: running from a Chennai console rewrote Delhi's
+    // contracts and looked like it had worked.
+    const q = city ? `?city=${encodeURIComponent(city)}` : "";
     const body: Record<string, unknown> = { agent };
     if (dispatchConfig) body.dispatch_config = dispatchConfig;
-    return apiFetch<PipelineRunResult>("/run/agent", {
+    return apiFetch<PipelineRunResult>(`/run/agent${q}`, {
       method: "POST",
       body: JSON.stringify(body),
     });

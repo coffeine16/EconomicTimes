@@ -108,10 +108,13 @@ export default function AdminPage() {
 
   // ── Agent pipeline ──────────────────────────────────────────────────────────
   const onAgentComplete = useCallback(() => {
-    // Re-read this city's contracts after a pipeline run.
+    // Re-read this city's contracts after a pipeline run. `actions` was missing,
+    // so the enforcement queue kept showing pre-run values while the map beside
+    // it had already updated.
     mutate([city, "hotspots"]);
     mutate([city, "fusion"]);
     mutate([city, "dispatch"]);
+    mutate([city, "actions"]);
     mutate([city, "audit"]);
   }, [city]);
   const { agents, running, runAgent, resetAgents } = useAgentRun(onAgentComplete);
