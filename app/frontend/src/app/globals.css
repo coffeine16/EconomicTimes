@@ -978,8 +978,12 @@ hr {
     padding: 4px var(--space-sm) !important;
     row-gap: 2px;
   }
-  .admin-header > *:first-child { order: 1; }
-  .admin-actions { order: 2; }
+  /* Target the logo by CLASS, not by :first-child. A structural selector breaks
+     silently the moment anyone reorders the markup or wraps two children in a
+     div — which is exactly how the city switcher ended up on the left edge with
+     its dropdown opening off-screen. */
+  .admin-logo   { order: 1; }
+  .admin-actions { order: 2; margin-left: auto; }
   .admin-nav {
     order: 3;
     flex-basis: 100% !important;
