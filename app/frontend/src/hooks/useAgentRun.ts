@@ -3,11 +3,15 @@ import { useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import type { AgentName, AgentState, PipelineRunResult } from "@/lib/types";
 import { AGENT_ORDER } from "@/lib/constants";
+import { useCity } from "@/lib/CityContext";
 
 const idleAgents = (): AgentState[] =>
   AGENT_ORDER.map((name) => ({ name, status: "idle" }));
 
 export function useAgentRun(onComplete?: () => void) {
+  // The run must target the city the console is showing, not whatever city the
+  // API happens to default to.
+  const { city } = useCity();
   const [agents, setAgents] = useState<AgentState[]>(idleAgents());
   const [running, setRunning] = useState(false);
   const [lastRun, setLastRun] = useState<PipelineRunResult | null>(null);
@@ -28,7 +32,7 @@ export function useAgentRun(onComplete?: () => void) {
     ));
 
     try {
-      const result = await api.runAgent(agent);
+      const result = await api.runAgent(agent, city);
       setLastRun(result);
       // Update each agent status from result
       result.agents.forEach((a) => markAgent(a.name, a.status, a.duration_ms));
@@ -45,7 +49,9 @@ export function useAgentRun(onComplete?: () => void) {
     } finally {
       setRunning(false);
     }
-  }, [onComplete]);
+    // `city` belongs here: without it the callback closes over a stale city and
+    // a run after switching cities would target the previous one.
+  }, [onComplete, city]);
 
   const resetAgents = useCallback(() => {
     setAgents(idleAgents());

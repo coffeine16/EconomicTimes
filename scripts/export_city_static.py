@@ -27,7 +27,7 @@ JSON_CONTRACTS = [
     "advisories.json",
     # Validation surfaces — the numbers the brief is scored on. Shipping them
     # makes the rigour visible in the product instead of only in a slide.
-    "forecast_eval.json", "loso.json",
+    "forecast_eval.json", "loso.json", "source_health.json",
 ]
 
 

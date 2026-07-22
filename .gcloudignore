@@ -11,11 +11,12 @@
 app/frontend/
 
 # Eval-only ground truth (46 MB). Serving never reads it.
-data/raw/truth.parquet
+# (path is per-city since the layout split, so glob every city)
+data/raw/*/truth.parquet
+data/outputs/*/audio/
 
 # Local convenience, not runtime data
 data/outputs_snapshots/
-data/outputs/audio/
 
 # Repo furniture
 .git/

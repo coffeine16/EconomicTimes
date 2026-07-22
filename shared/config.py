@@ -3,8 +3,14 @@ import os
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-DATA_RAW = ROOT / "data" / "raw"
-DATA_OUT = ROOT / "data" / "outputs"
+
+# Base trees. The per-CITY paths (DATA_RAW / DATA_OUT) are defined below, once
+# CITY is known — a city's raw feeds and its outputs are not interchangeable, and
+# a single flat directory meant the last pipeline run silently owned them. That
+# bit us: an export run with AQ_CITY=delhi wrote Bengaluru's artifacts into the
+# Delhi bundle, because the env var said Delhi while the directory held Bengaluru.
+DATA_RAW_BASE = ROOT / "data" / "raw"
+DATA_OUT_BASE = ROOT / "data" / "outputs"
 
 
 def _load_dotenv(path: Path = ROOT / ".env") -> None:
@@ -47,6 +53,14 @@ CITY = os.environ.get("AQ_CITY", "bengaluru").lower()
 if CITY not in CITIES:
     raise ValueError(f"AQ_CITY={CITY!r} unknown; choose from {list(CITIES)}")
 BBOX = CITIES[CITY]
+
+# Per-city data trees. Bound by VALUE at import, so one PROCESS serves one city —
+# which is exactly right for the batch pipeline and for a worker. A server that
+# must answer for several cities resolves the directory per request instead
+# (see app/backend/main.py::_city_out) rather than mutating these.
+DATA_RAW = DATA_RAW_BASE / CITY
+DATA_OUT = DATA_OUT_BASE / CITY
+
 WARD_GEOJSON = ROOT / "data" / f"{CITY}_wards.geojson"   # real boundaries if present
 
 # ---- The window the live collectors pull ----

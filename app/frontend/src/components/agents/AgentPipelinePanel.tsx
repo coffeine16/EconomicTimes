@@ -13,6 +13,9 @@
 import type { AgentState, AgentName } from "@/lib/types";
 import { AGENT_LABELS, AGENT_DESCRIPTIONS, AGENT_ORDER, AGENT_ICONS } from "@/lib/constants";
 import { icon, X, Play, LoaderCircle, Check } from "@/components/Icon";
+import useSWR from "swr";
+import { api } from "@/lib/api";
+import { useCity } from "@/lib/CityContext";
 
 const STATUS = {
   idle:    { color: "var(--text-tertiary)", ring: "var(--border-default)", label: "" },
@@ -31,6 +34,17 @@ export default function AgentPipelinePanel({
   onRun: (agent: AgentName | "all") => void;
   onReset: () => void;
 }) {
+  const { city } = useCity();
+  const { data: apiHealth } = useSWR("api-health", () => api.getApiHealth(),
+    { revalidateOnFocus: false, shouldRetryOnError: false });
+  // The API is multi-city: a run carries `?city=` and executes against the city
+  // on screen. What can still go wrong is that the backend has no pipeline
+  // output for this city on disk — so THAT is the condition worth warning about,
+  // not which city the API happens to default to.
+  const hasBackend = Boolean(apiHealth?.ok);
+  const available = apiHealth?.cities_available ?? null;
+  const cityUnavailable = hasBackend && available !== null && !available.includes(city);
+
   const stateOf = (n: AgentName) => agents.find((a) => a.name === n)?.status ?? "idle";
   const durOf = (n: AgentName) => agents.find((a) => a.name === n)?.duration_ms;
   const doneCount = agents.filter((a) => a.status === "done").length;
@@ -110,6 +124,27 @@ export default function AgentPipelinePanel({
               <button className="btn btn-ghost btn-sm" onClick={onReset}>Reset</button>
             )}
           </div>
+
+          {/* Say so BEFORE the click rather than letting it surface as nine red
+              FAILED badges: the agents read precomputed artifacts, and this city
+              has none on the server. Browsing is unaffected — the map, queue and
+              citizen view come from that city's static bundle. */}
+          {cityUnavailable && (
+            <p className="alert alert-caution" style={{ marginTop: "var(--space-sm)", fontSize: "0.74rem" }}>
+              <span className="alert-body">
+                The deployed API has no pipeline output for <strong>{city}</strong>
+                {available && available.length > 0 && <> (it holds {available.join(", ")})</>},
+                so a live run will fail here. Everything you are viewing is
+                per-city and unaffected.
+              </span>
+            </p>
+          )}
+          {!hasBackend && (
+            <p style={{ marginTop: "var(--space-sm)", fontSize: "0.74rem", color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+              No pipeline backend connected — this deployment reads precomputed
+              batch output. The flow below is what runs offline.
+            </p>
+          )}
         </div>
 
         {/* The flow */}

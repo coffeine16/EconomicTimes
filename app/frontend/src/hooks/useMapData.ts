@@ -3,6 +3,13 @@
  * useMapData — generic SWR hooks for all secondary map layers.
  * Satellite, wind, and stations are not-yet-built endpoints;
  * they fall back gracefully to empty arrays / stubs.
+ *
+ * ⚠️ These hooks are CITY-BLIND and currently unmounted — the console reads the
+ * per-city bundles via `api.city*(city)` instead. Do not wire one of these into
+ * a page as-is: it would render the API's default city's data underneath
+ * whatever the city switcher says. Take a `city` argument first, key the SWR
+ * cache on it, and call the matching `api.city*` getter.
+ * (Kept because api.ts imports the Station / FireDetection contracts below.)
  */
 import useSWR from "swr";
 import { api, apiFetch } from "@/lib/api";

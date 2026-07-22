@@ -15,10 +15,12 @@ Endpoints:
     GET /loso                    fusion validation metrics
 """
 import json
+from pathlib import Path
 
 import pandas as pd
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from shared.config import DATA_OUT, DATA_RAW
 
@@ -32,23 +34,78 @@ from fastapi.staticfiles import StaticFiles
 app.mount("/audio", StaticFiles(directory=str(DATA_OUT / "audio")), name="audio")
 
 
+# ── Per-request city scope ────────────────────────────────────────────────────
+# shared.config binds DATA_OUT/DATA_RAW by VALUE at import, so one process serves
+# one city — right for the batch pipeline, wrong for a server that must answer for
+# three. Rather than edit 23 endpoints, a middleware resolves ?city= once per
+# request into a ContextVar and the path helpers read it. Endpoints stay unchanged
+# and CANNOT accidentally read the wrong city, because they no longer name one.
+from contextvars import ContextVar  # noqa: E402
+from shared.config import CITIES, CITY, DATA_OUT_BASE, DATA_RAW_BASE  # noqa: E402
+
+_req_city: ContextVar[str] = ContextVar("req_city", default=CITY)
+
+
+@app.middleware("http")
+async def _city_scope(request, call_next):
+    want = (request.query_params.get("city") or CITY).lower()
+    if want not in CITIES:
+        return JSONResponse({"detail": f"unknown city {want!r}; choose from {sorted(CITIES)}"},
+                            status_code=400)
+    token = _req_city.set(want)
+    try:
+        return await call_next(request)
+    finally:
+        _req_city.reset(token)
+
+
+def _city() -> str:
+    return _req_city.get()
+
+
+def _city_out() -> Path:
+    """Output tree for THIS request's city."""
+    return DATA_OUT_BASE / _city()
+
+
+def _city_raw() -> Path:
+    return DATA_RAW_BASE / _city()
+
+
 def _json(name: str):
-    """Read a precomputed contract. UTF-8 EXPLICITLY.
+    """Read a precomputed contract for this request's city. UTF-8 EXPLICITLY.
 
     read_text() uses the platform default, which on Windows is cp1252 — it raises
     UnicodeDecodeError the moment an advisory contains Kannada or Hindi. The citizen
     endpoints are the whole point of the language-coverage work, so this is not
     optional.
     """
-    p = DATA_OUT / name
+    p = _city_out() / name
     if not p.exists():
-        raise HTTPException(404, f"{name} not generated yet — run the pipeline first")
+        raise HTTPException(
+            404, f"{name} not generated for {_city()} — run the pipeline for that city")
     return json.loads(p.read_text(encoding="utf-8"))
 
 
 @app.get("/health")
 def health():
-    return {"ok": True, "outputs_present": sorted(p.name for p in DATA_OUT.glob("*"))}
+    """Liveness + WHICH CITY this instance actually serves.
+
+    Data is per-city on disk, so report which cities this instance can actually
+    answer for — the UI should offer a live run only for those, rather than
+    discovering the gap as a 404.
+    """
+    available = sorted(
+        c for c in CITIES
+        if (DATA_OUT_BASE / c / "hotspots.json").exists()
+    )
+    return {
+        "ok": True,
+        "city": _city(),               # this request's scope
+        "default_city": CITY,          # what an unqualified request gets
+        "cities_available": available,  # cities with pipeline output on disk
+        "outputs_present": sorted(p.name for p in _city_out().glob("*")),
+    }
 
 
 @app.get("/hotspots")
@@ -84,7 +141,7 @@ def attribution(cell: str):
 
 @app.get("/fusion")
 def fusion(hour_offset: int = 0):
-    p = DATA_OUT / "fusion_field.parquet"
+    p = _city_out() / "fusion_field.parquet"
     if not p.exists():
         raise HTTPException(404, "fusion field not generated yet")
     f = pd.read_parquet(p)
@@ -110,7 +167,7 @@ def loso():
 @app.get("/stations")
 def stations():
     """CAAQMS station locations + their latest reading. Feeds the map's station markers."""
-    p = DATA_RAW / "stations.parquet"
+    p = _city_raw() / "stations.parquet"
     if not p.exists():
         raise HTTPException(404, "stations not ingested yet — run the pipeline first")
     df = pd.read_parquet(p)
@@ -136,7 +193,7 @@ def satellite():
     them would invite the map to render retrieval error as signal. Detection reads
     exactly this NO2 field; showing it explains WHY a hotspot fired.
     """
-    p = DATA_RAW / "satellite.parquet"
+    p = _city_raw() / "satellite.parquet"
     if not p.exists():
         raise HTTPException(404, "satellite not ingested yet — run the pipeline first")
     df = pd.read_parquet(p)
@@ -174,7 +231,7 @@ def voice(ward_id: str, lang: str = "en"):
     text, so a `cross_checked` (not native-reviewed) advisory must not launder
     that fact by becoming a voice note. The frontend should surface it.
     """
-    manifest_p = DATA_OUT / "audio" / "manifest.json"
+    manifest_p = _city_out() / "audio" / "manifest.json"
     if not manifest_p.exists():
         raise HTTPException(404, "no voice audio generated yet — run the pipeline")
     for e in json.loads(manifest_p.read_text(encoding="utf-8")):
@@ -210,11 +267,48 @@ def run_agent(body: dict):
     deterministic re-scoring of artifacts already on disk (~seconds). Ingestion,
     the panel and fusion/LOSO are unreachable from here by construction.
     """
-    from intelligence.orchestrator import run_chain, AGENT_NAMES
+    from intelligence.orchestrator import AGENT_NAMES
     agent = (body or {}).get("agent", "all")
     if agent != "all" and agent not in AGENT_NAMES:
         raise HTTPException(400, f"unknown agent {agent!r}; choose from {AGENT_NAMES} or 'all'")
-    return run_chain(agent)
+
+    city = _city()
+    if not (DATA_OUT_BASE / city / "panel.parquet").exists():
+        raise HTTPException(404, f"no pipeline artifacts for {city} — the agents read a "
+                                 f"precomputed panel, which this deployment does not carry")
+
+    # Fast path: this process was started for this city, so DATA_OUT already
+    # points at the right tree.
+    if city == CITY:
+        from intelligence.orchestrator import run_chain
+        return run_chain(agent)
+
+    # Another city. shared.config binds DATA_OUT at IMPORT, so we cannot simply
+    # set an env var and call run_chain — the agents already captured the wrong
+    # paths. Mutating module state under a live server is worse: it races other
+    # in-flight requests. Run the chain in a child process with AQ_CITY set, which
+    # is correct by isolation. Costs one interpreter start (~4s) on top of ~15s.
+    import os
+    import subprocess
+    import sys
+    import tempfile
+    from shared.config import ROOT
+
+    with tempfile.TemporaryDirectory() as td:
+        out = Path(td) / "result.json"
+        child = (
+            "import json,sys;"
+            "from intelligence.orchestrator import run_chain;"
+            "r=run_chain(sys.argv[1]);"
+            "open(sys.argv[2],'w',encoding='utf-8').write(json.dumps(r,default=str))"
+        )
+        env = {**os.environ, "AQ_CITY": city, "PYTHONPATH": str(ROOT)}
+        proc = subprocess.run([sys.executable, "-c", child, agent, str(out)],
+                              cwd=str(ROOT), env=env, capture_output=True, timeout=240)
+        if not out.exists():
+            tail = (proc.stderr or b"").decode(errors="replace")[-400:]
+            raise HTTPException(500, f"agent run for {city} failed: {tail}")
+        return json.loads(out.read_text(encoding="utf-8"))
 
 
 @app.get("/ledger")
@@ -249,7 +343,7 @@ def memo(action_id: str):
 def fires():
     """FIRMS thermal detections in the window. The instrument that finds burning
     sources directly — and the one that located Bhalswa."""
-    p = DATA_RAW / "fires.parquet"
+    p = _city_raw() / "fires.parquet"
     if not p.exists():
         raise HTTPException(404, "fires not ingested yet — run the pipeline first")
     df = pd.read_parquet(p)
@@ -274,7 +368,7 @@ def compare():
     """Multi-city comparison rows. Each row is one FULL LIVE pipeline run over a
     real city (real Sentinel-5P / FIRMS / OpenAQ / OSM), distilled by
     scripts/city_summary.py. Returns [] until at least one city has been run."""
-    p = DATA_OUT / "city_comparison.json"
+    p = DATA_OUT_BASE / "city_comparison.json"
     if not p.exists():
         return []
     return json.loads(p.read_text(encoding="utf-8"))
@@ -282,7 +376,7 @@ def compare():
 def audit():
     """Monitoring network audit (F4): blind spots (dirty unmonitored cells ->
     next-sensor placement) + sensor flags. Empty envelope until the pipeline runs."""
-    p = DATA_OUT / "audit.json"
+    p = _city_out() / "audit.json"
     if not p.exists():
         return {"blind_spots": [], "sensor_flags": [], "placement_recommendations": []}
     return json.loads(p.read_text(encoding="utf-8"))

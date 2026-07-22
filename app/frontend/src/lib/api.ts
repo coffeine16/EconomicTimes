@@ -10,6 +10,17 @@
 // .env.local (see .env.example).
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
+/**
+ * Is a pipeline backend reachable at all?
+ *
+ * The agent pipeline is a BATCH job (minutes: satellite pulls, model training),
+ * not something an HTTP request can run. A static deploy has no backend, so
+ * offering a "Run pipeline" button there produces nine red FAILED badges for a
+ * request that was never going to work. Read-only surfaces are unaffected — they
+ * read the precomputed JSON that the batch run already produced.
+ */
+export const HAS_BACKEND = Boolean(process.env.NEXT_PUBLIC_API_URL);
+
 // Citizen reports do NOT go to the read-only FastAPI backend. They go to the n8n
 // channel layer (live, HTTPS), which validates, canonicalises the ward against the
 // official list, and writes to Supabase — the same table the pipeline syncs down
@@ -46,16 +57,19 @@ function getFallbackPath(endpoint: string): string | null {
 /**
  * City-scoped fetch: reads a contract from that city's static bundle
  * (public/data/<city>/<file>). This is how city-switching works — every map
- * contract lives per-city and needs no backend. Falls back to the legacy flat
- * /data/<file> (the default-city bundle) if the per-city file is absent.
+ * contract lives per-city and needs no backend.
+ *
+ * A missing file yields the EMPTY fallback, never another city's data. This
+ * used to fall through to the flat /data/<file> bundle, which is one city's
+ * export: a Chennai console missing one contract would then have rendered
+ * Delhi's hotspots under a Chennai label. An empty layer is a visible absence;
+ * the wrong city's layer is an invisible lie.
  */
 export async function cityFetch<T>(city: string, file: string, fallback: T): Promise<T> {
-  for (const url of [`/data/${city}/${file}`, `/data/${file}`]) {
-    try {
-      const res = await fetch(url, { next: { revalidate: 0 } });
-      if (res.ok) return (await res.json()) as T;
-    } catch { /* try next */ }
-  }
+  try {
+    const res = await fetch(`/data/${city}/${file}`, { next: { revalidate: 0 } });
+    if (res.ok) return (await res.json()) as T;
+  } catch { /* fall through to the empty fallback */ }
   return fallback;
 }
 
@@ -158,6 +172,17 @@ export const api = {
   getComparison: () =>
     apiFetch<CityComparison[]>("/compare").catch(() => [] as CityComparison[]),
 
+  // Which city does the deployed API default to? The container now ships every
+  // city's artifacts and `?city=` selects among them, so this is the fallback
+  // when no city is named — not a limit. Null when there is no backend.
+  getApiHealth: () =>
+    apiFetch<{
+      ok: boolean;
+      city?: string;
+      default_city?: string;
+      cities_available?: string[];
+    }>("/health").catch(() => null),
+
   // Sentinel-5P NO2 column per cell — the raw signal detection runs on.
   getSatellite: () =>
     apiFetch<{ cell: string; no2: number }[]>("/satellite").catch(() => [] as { cell: string; no2: number }[]),
@@ -169,12 +194,15 @@ export const api = {
     } as AuditResponse)),
 
   // ─── Agent pipeline ───────────────────────────────────────────────────────────
-  runAgent: async (agent: AgentName | "all"): Promise<PipelineRunResult> => {
-    const res = await apiFetch<PipelineRunResult>("/run/agent", {
+  // `city` is not optional in spirit: the API serves whichever city it is asked
+  // for and defaults to its own. Running the agents for Delhi while the console
+  // displays Chennai would rewrite the wrong city's contracts, so pass it.
+  runAgent: async (agent: AgentName | "all", city?: string): Promise<PipelineRunResult> => {
+    const q = city ? `?city=${encodeURIComponent(city)}` : "";
+    return apiFetch<PipelineRunResult>(`/run/agent${q}`, {
       method: "POST",
       body: JSON.stringify({ agent }),
     });
-    return res;
   },
 
   // ─── Memo ────────────────────────────────────────────────────────────────────
@@ -182,8 +210,10 @@ export const api = {
   // read-only). "Generate memo" fetches a document that already exists. Accepts an
   // action_id OR a zone_id — the backend matches either. When the backend is down,
   // fall back to the static memos.json and match client-side (demo insurance).
-  // `city` matters: memos are per-city, so a Chennai zone must not resolve against
-  // Delhi's memo file.
+  // `city` matters on BOTH paths: memos are per-city, so a Chennai zone must not
+  // resolve against Delhi's memo file — and the backend defaults to its own city
+  // when the query param is absent, which would have returned a Delhi memo for a
+  // Chennai zone with no visible error.
   getMemo: async (id: string, city?: string): Promise<Memo> => {
     const local = async () => {
       const memos = city
@@ -195,8 +225,9 @@ export const api = {
       if (!memo) throw new Error(`no memo for ${id}`);
       return memo;
     };
+    const q = city ? `?city=${encodeURIComponent(city)}` : "";
     try {
-      return await apiFetch<Memo>(`/memo/${id}`);
+      return await apiFetch<Memo>(`/memo/${id}${q}`);
     } catch {
       const memo = await local();
       return memo;
