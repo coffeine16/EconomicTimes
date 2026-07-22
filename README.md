@@ -501,7 +501,7 @@ runs on Cloud Run, serving all three cities from one instance.
 |---|---|
 | **Saumya Saraswat** | Intelligence, with inputs on Frontend |
 | **Suyash Mittal** | EPS, Deployment |
-| **Keshav Agarwal** | Backend, Frontend, Agents |
+| **Keshav Agrawal** | Backend, Frontend, Agents |
 | **Shyamsundar Paramasivam** | Backend, Frontend |
 
 
