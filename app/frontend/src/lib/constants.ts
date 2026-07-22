@@ -8,14 +8,36 @@ import type { AgentName, HotspotKind, SourceCategory, ReportCategory, LayerId } 
 
 // ─── Map ──────────────────────────────────────────────────────────────────────
 
-/** Delhi initial viewport */
+/**
+ * Opening viewport per city.
+ *
+ * This used to be a single hardcoded Delhi position. The map therefore always
+ * opened over Delhi, and when the saved city was Chennai or Bengaluru the
+ * viewport sat ~1,700 km from the data — hexagons rendered off-screen and the
+ * map looked empty until you switched city, which forced a recentre. It only
+ * showed up once localStorage held a non-Delhi city, which is why it appeared
+ * to be intermittent.
+ *
+ * The recentre effect in MapContainer still fits to the loaded data; this makes
+ * the FIRST frame land in the right place instead of relying on that.
+ */
+export const CITY_VIEW_STATE: Record<string, { longitude: number; latitude: number }> = {
+  delhi:     { longitude: 77.15, latitude: 28.60 },
+  chennai:   { longitude: 80.24, latitude: 13.05 },
+  bengaluru: { longitude: 77.59, latitude: 12.97 },
+};
+
 export const INITIAL_VIEW_STATE = {
-  longitude: 77.15,
-  latitude: 28.60,
+  ...CITY_VIEW_STATE.delhi,
   zoom: 11,
   pitch: 30,
   bearing: 0,
 } as const;
+
+/** Opening viewport for a given city, falling back to the default. */
+export function initialViewFor(city: string) {
+  return { ...INITIAL_VIEW_STATE, ...(CITY_VIEW_STATE[city] ?? {}) };
+}
 
 /** Carto dark tiles (no token required) */
 export const MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";

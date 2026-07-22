@@ -11,7 +11,7 @@ import { H3HexagonLayer } from "@deck.gl/geo-layers";
 import { cellToLatLng } from "h3-js";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import { INITIAL_VIEW_STATE, MAP_STYLE } from "@/lib/constants";
+import { initialViewFor, MAP_STYLE } from "@/lib/constants";
 import { pm25ToRgbaArray, SEVERITY_COLORS, hexToRgba, UNKNOWN_HEX } from "@/lib/colors";
 import type { FusionCell, Hotspot, LayerVisibility, MapFilters, DispatchRoute, BlindSpot } from "@/lib/types";
 import type { Station, FireDetection } from "@/hooks/useMapData";
@@ -74,9 +74,12 @@ export default function MapContainer({
   recenterKey,
   showOverlays = true,
 }: Props) {
+  // Open on THIS city, not on Delhi. The recentre effect below still fits to the
+  // loaded data; this makes the first frame land in the right hemisphere so the
+  // map is never blank while the data is on its way.
   const [viewState, setViewState] = useState<{
     longitude: number; latitude: number; zoom: number; pitch: number; bearing: number;
-  }>({ ...INITIAL_VIEW_STATE });
+  }>(() => initialViewFor(recenterKey ?? "delhi"));
 
   // Theme-aware base map: dark-matter on dark, positron (light) on light. Follows
   // the same data-theme attribute the ThemeToggle stamps on <html>.
@@ -126,9 +129,14 @@ export default function MapContainer({
   const fittedKey = useRef<string | null>(null);
   useEffect(() => {
     const key = recenterKey ?? "default";
-    if (fittedKey.current === key) return;   // already centred for this city
+    if (fittedKey.current === key) return;   // already fitted to this city's data
     const c = dataCenter();
-    if (!c) return;                          // wait for this city's data to load
+    // No data yet: leave the viewport where it is and do NOT mark this city
+    // fitted, so the fit runs as soon as the hexagons arrive. We can afford to
+    // wait now because the map already OPENS on the right city (see useState
+    // above) — previously it opened on a hardcoded Delhi, which is what left
+    // Chennai and Bengaluru looking blank on a cold load.
+    if (!c) return;
     fittedKey.current = key;
     setViewState((vs) => ({ ...vs, ...c, zoom: 10.5 }));
   }, [recenterKey, dataCenter]);

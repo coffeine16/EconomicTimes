@@ -12,6 +12,8 @@ import Map from "react-map-gl/maplibre";
 import DeckGL from "@deck.gl/react";
 import { H3HexagonLayer } from "@deck.gl/geo-layers";
 import { cellToLatLng } from "h3-js";
+import { initialViewFor } from "@/lib/constants";
+import { useCity } from "@/lib/CityContext";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { pm25ToRgbaArray } from "@/lib/colors";
@@ -34,7 +36,13 @@ export default function CitizenMap({
   height?: number | string;
   interactive?: boolean;
 }) {
-  const [view, setView] = useState({ longitude: 77.15, latitude: 28.6, zoom: 10.5, pitch: 0, bearing: 0 });
+  // Opens on the ACTIVE city, not a hardcoded Delhi. The fit below still flies to
+  // the real cells once they load; this stops the first frame being an empty map
+  // 1,700 km from a Chennai or Bengaluru ward.
+  const { city } = useCity();
+  const [view, setView] = useState(() => ({
+    ...initialViewFor(city), zoom: 10.5, pitch: 0, bearing: 0,
+  }));
   const fittedFor = useRef<string | null>(null);
 
   // theme-aware base map — reads the same data-theme the app toggles
