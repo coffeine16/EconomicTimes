@@ -27,6 +27,40 @@ This platform detects sources from instruments that cover **every cell equally**
 names them with an inspectable evidence chain, and reports honestly on what it
 **cannot** see.
 
+<p align="center">
+  <img src="./docs/img/console-map.png" alt="AirCase admin console: a Delhi hotspot zone selected, showing its attributed source, evidence chain and EPS breakdown beside the map" width="100%" />
+</p>
+
+<p align="center">
+  <sub><b>The enforcement console.</b> A chronic zone in KAPASHERA, attributed to
+  traffic, with the deterministic score, the evidence behind it, the EPS breakdown,
+  and a one-click memo. Every layer on the left is a real instrument.</sub>
+</p>
+
+<table>
+<tr>
+<td width="46%" valign="top">
+  <img src="./docs/img/citizen-ward.png" alt="AirCase citizen view for MUNIRKA ward: AQI 404 Severe, a section explaining why, and a statement that the reading is a model estimate" width="100%" />
+</td>
+<td valign="top">
+
+**The same platform, facing the citizen.**
+
+AQI 404, Severe — the number every app shows. Then the two nobody else does:
+
+**Why your air is like this.** Here it says *no source was attributed in this
+ward* — because none was. Our instruments found nothing standing out, and the
+panel says so rather than inventing a cause. Where a source *is* found, this is
+where its evidence chain appears.
+
+**How much to trust this number.** It is a model estimate for the ward, not a
+measurement at the doorstep. Most of the city has no monitor within kilometres,
+and a product that hides that is selling certainty it does not have.
+
+</td>
+</tr>
+</table>
+
 ---
 
 ## Run it in under a minute
