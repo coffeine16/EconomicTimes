@@ -70,8 +70,31 @@ CONTRAST_THRESH = 2.0    # robust-z above the surrounding annulus to count as ho
 
 # Enforceability. `road` is excluded on purpose: you cannot serve a notice on a
 # road, so road proximity never makes a hotspot attributable.
-ENFORCEABLE_KINDS = ["industrial", "construction", "waste_burning", "traffic"]
-ATTRIBUTABLE_KM = 3.0    # a candidate site this close is something to go inspect
+#
+# `traffic` was excluded for the SAME reason, after measuring that this rule was
+# not discriminating at all: on real Delhi, Chennai and Bengaluru it marked
+# 70/70, 157/157 and 51/51 hotspots enforceable. Never once diffuse. Two causes,
+# both fixed here:
+#
+#   1. `traffic` (1,240 features in Delhi, 1,286 in Bengaluru) is a corridor or a
+#      junction — you can no more serve a notice on it than on a road. Counting
+#      it re-admitted the exact road network the NO2-alone clause below exists to
+#      keep out, and it is what this project's own architecture doc calls the
+#      textbook diffuse source. Delhi's hotspots move from a median 0.73 km to a
+#      named candidate to 1.03 km once corridors stop counting.
+#
+#   2. 3 km was not a threshold, it was a tautology. In a real Indian city SOME
+#      industrial or construction feature is always within 3 km — the FURTHEST
+#      hotspot in any of the three cities was 2.87 km — so the test could only
+#      ever return True and the fire clause was never consulted.
+#
+# 500 m is the honest replacement because it is a claim the instrument can
+# support: the H3 res-8 cell is ~460 m across, so it means "the candidate is in
+# this hexagon or the one touching it". That is the tightest spatial coincidence
+# the grid can express, and beyond it we are asserting a link the data does not
+# carry. It is a deliberately conservative bar for putting an inspector in a van.
+ENFORCEABLE_KINDS = ["industrial", "construction", "waste_burning"]
+ATTRIBUTABLE_KM = 0.5    # a candidate site this close is something to go inspect
 POINT_TRACER_Z = 2.0     # SO2 / aerosol index: emitted by point sources, not by roads
 ZONE_LINK_KM = 2.0       # hotspot cells this close belong to the same source zone
 
