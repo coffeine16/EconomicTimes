@@ -45,16 +45,17 @@ python scripts/eval_detection.py                         # THE headline stat
 
 Then serve it:
 
-The `--full` run drives the whole **7-agent pipeline** and writes every JSON
+The `--full` run drives the whole **9-agent pipeline** and writes every JSON
 contract (`hotspots`, `attributions`, `forecast`, `actions`, `dispatch`, `memos`,
 `advisories`, `ledger`) to `data/outputs/`. Then serve it:
 
 ```bash
-uvicorn app.backend.main:app --reload --port 8000        # 20+ endpoints: /hotspots, /attribution/{cell}, /actions, /dispatch, /ledger, /advisories …
+uvicorn app.backend.main:app --reload --port 8000        # 23 endpoints: /hotspots, /attribution/{cell}, /actions, /dispatch, /ledger, /advisories …
 ```
 
-> **The API is real and read-only; the React/Leaflet console is the active build.**
-> The channel layer (n8n citizen bot + inspector loop) is **live and deployed**. See
+> **All three tiers are deployed.** The Next.js console and citizen view are live
+> on Vercel; the read-only API and the 9-agent chain run on Google Cloud Run; the
+> channel layer (n8n citizen bot + inspector loop) is live behind HTTPS. See
 > [what's real vs prototype](#whats-real-vs-prototype) — we'd rather tell you than
 > let you find out.
 
@@ -65,7 +66,7 @@ uvicorn app.backend.main:app --reload --port 8000        # 20+ endpoints: /hotsp
 **On real data.** Delhi, November 2025 — real Sentinel-5P, real NASA FIRMS, real
 CPCB stations, real OpenStreetMap:
 
-> ### 🔥 Bhalswa landfill → `waste_burning`, confidence 0.67
+> ### Bhalswa landfill → `waste_burning`, confidence 0.76
 > *evidence: satellite fire detections in 30 hours (18% of the window);
 > shallow boundary layer (120 m) trapping emissions*
 
@@ -110,12 +111,43 @@ So we deleted both channels, and the industrial sources went with them. **4/4 �
 Our simulation had given the instruments a signal they do not have — the same class
 of error as [the 100% trap](#the-100-trap), one level deeper.
 
+### The evaluation was flattering our own baseline
+
+Forecasts are scored against **persistence** — *"it will stay as it is."* We kept
+losing to it at 24 h and could not work out why the model was so weak.
+
+It was not. The **evaluation** was.
+
+PM2.5 runs on a daily cycle, so persistence is accidentally *in phase* at 24-hour
+multiples — it compares a value to the same hour of the previous day. Between
+those points it compares night to day and collapses. On real Delhi:
+
+| lead | 3 h | 12 h | **24 h** | 36 h | **48 h** | 60 h | **72 h** |
+|---|---|---|---|---|---|---|---|
+| our model | 59.6 | 69.4 | 74.0 | 77.9 | 80.8 | 81.2 | 81.3 |
+| persistence | 69.4 | 107.6 | **76.2** | 117.3 | **92.7** | 116.2 | **87.5** |
+| skill | +14% | +36% | **+3%** | +34% | **+13%** | +30% | **+7%** |
+
+Every standard benchmark — including the one in our own brief — samples 24, 48 and
+72 h. **Exactly the three points where the baseline is strongest.** Re-scored every
+three hours, the model beats persistence at all 24 lead times in Delhi.
+
+**And in Chennai we lose.** It is coastal, the sea breeze flattens the diurnal
+cycle, persistence stays strong, and we do not beat it until 51 h. We ship that
+curve beside Delhi's — a method that only publishes the city where it wins is not
+a method.
+
+We also tested adding a meteorology forecast, as an **oracle**: feeding the model
+the met that actually occurred, the most favourable case that exists. It did not
+help in any city, so we did not build the plumbing. A negative result we went
+looking for.
+
 ---
 
 ## How it works — the whole system at a glance
 
 Three tiers: a **batch data platform** turns raw feeds into a feature table; a
-**7-agent pipeline** turns that table into named sources, priorities, memos and
+**9-agent pipeline** turns that table into named sources, priorities, memos and
 advisories; a **read-only serving layer** exposes precomputed JSON that the
 frontend and channels consume. Heavy compute never touches a request handler.
 
@@ -135,17 +167,16 @@ flowchart LR
     PANEL --> FUSION["Fusion field · LightGBM"]
     PANEL --> AGENTS
 
-    subgraph AGENTS["③ Agent pipeline (LangGraph · 7 nodes)"]
+    subgraph AGENTS["③ Agent pipeline (LangGraph · 9 nodes)"]
         direction LR
-        DET["detect"] --> ATT["attribute"] --> FC["forecast"] --> PR["prioritise"] --> MO["memo"] --> AD["advise"] --> LG["ledger"]
+        DET["detect"] --> ATT["attribute"] --> FC["forecast"] --> PR["prioritise"] --> MO["memo"] --> AD["advise"] --> VO["voice"] --> LG["ledger"] --> AU["audit"]
     end
 
     FUSION -->|"EXPOSURE · what people breathe"| API
     AGENTS -->|"SOURCES · who to inspect, what to do"| API
-    API["④ Read-only FastAPI<br/>precomputed JSON contracts"] --> FE["Frontend · React + Leaflet<br/>(building)"]
+    API["④ Read-only FastAPI<br/>precomputed JSON contracts"] --> FE["Frontend · Next.js + deck.gl<br/>(deployed)"]
     API --> CH["Channels · n8n<br/>advisories, inspector loop"]
 
-    style FE stroke-dasharray: 5 5
 ```
 
 **LLMs explain. Deterministic code decides.** Category scores, priority scores,
@@ -162,29 +193,31 @@ and clamps the category before anything is stored (see the [citizen loop](#the-c
 
 ## The agent pipeline — signal to action
 
-One `LangGraph` state machine runs seven agents over a shared typed state. Each
+One `LangGraph` state machine runs nine agents over a shared typed state. Each
 node is wrapped so one failure degrades the output instead of killing the run; the
 same graph backs both the batch pipeline and the API's `POST /run/agent`, so chain
 order can never drift between them.
 
 ```mermaid
 flowchart TD
-    D["🛰️ detect<br/><small>NO₂ contrast + fire persistence → zones</small>"]
-    A["🔍 attribute<br/><small>deterministic category scores + evidence chain + confidence</small>"]
-    F["📈 forecast<br/><small>24–72 h PM2.5 vs persistence baseline</small>"]
-    P["🎯 prioritise<br/><small>Enforcement Priority Score + dispatch routing</small>"]
-    M["📄 memo<br/><small>dispatch-ready notice + rule-matched legal basis</small>"]
-    V["📢 advise<br/><small>ward health advisories · Kannada/Hindi/Tamil/English</small>"]
-    L["📒 ledger<br/><small>freeze counterfactual forecast · track signal→memo→dispatch time</small>"]
-    D --> A --> F --> P --> M --> V --> L
+    D["detect<br/><small>NO₂ contrast + fire persistence → zones</small>"]
+    A["attribute<br/><small>deterministic category scores + evidence chain + confidence</small>"]
+    F["forecast<br/><small>24–72 h PM2.5 vs persistence baseline</small>"]
+    P["prioritise<br/><small>Enforcement Priority Score + dispatch routing</small>"]
+    M["memo<br/><small>dispatch-ready notice + rule-matched legal basis</small>"]
+    V["advise<br/><small>ward advisories · English + the city language<br/>hi · ta · kn</small>"]
+    L["ledger<br/><small>freeze counterfactual forecast · track signal→memo→dispatch time</small>"]
+    VO["voice<br/><small>advisory text → MP3 per ward, per language</small>"]
+    AU["audit<br/><small>monitoring blind spots → next-sensor placement</small>"]
+    D --> A --> F --> P --> M --> V --> VO --> L --> AU
 
-    A -. "citizen reports<br/>corroborate" .-> CIT["👥 citizen evidence<br/><small>from the channel layer</small>"]
+    A -. "citizen reports<br/>corroborate" .-> CIT["citizen evidence<br/><small>from the channel layer</small>"]
     CIT -. "+1 independent instrument<br/>(capped)" .-> A
 
     classDef det fill:#0f6b3f22,stroke:#0f6b3f;
     classDef llm fill:#a9760a22,stroke:#a9760a;
-    class D,P det
-    class A,F,M,V llm
+    class D,P,L,AU det
+    class A,F,M,V,VO llm
 ```
 
 Green nodes are pure arithmetic; amber nodes call an LLM **for prose only**, each
@@ -215,8 +248,10 @@ ever saw gets the same prediction as the worst station. Its field is
 background-dominated by construction.
 
 **The fusion field is an exposure map, not a detector.** It answers *"what is a
-person in this cell breathing"* — which it does well (LOSO R² 0.90, ~36% better
-than the station-mean map) and which is a genuinely useful product.
+person in this cell breathing"*. On the synthetic world it does that well — LOSO
+R² 0.90, ~36% better than the station-mean map. **On real Delhi it does not**: it
+is worse than a naive city mean, and we withdraw the claim rather than quote the
+synthetic number. Detection is the contribution; see the status table.
 
 Detection instead runs on the two instruments with **uniform coverage — every
 cell, no siting bias:**
@@ -258,7 +293,7 @@ against the same endpoint), deployed on n8n behind automatic HTTPS.
 
 ```mermaid
 flowchart LR
-    U["📱 Citizen<br/><small>“Bhalswa mein kachra<br/>jal raha hai”</small>"] --> TG["Telegram / web form"]
+    U["Citizen<br/><small>“Bhalswa mein kachra<br/>jal raha hai”</small>"] --> TG["Telegram / web form"]
     TG --> N8N
 
     subgraph N8N["n8n workflow — channels stay DUMB"]
@@ -267,9 +302,9 @@ flowchart LR
         GEM --> FIN["Finalize · DECIDE<br/><small>canonicalise ward vs 733 official names;<br/>clamp category; keyword fallback</small>"]
     end
 
-    FIN --> SUP["🗄️ Supabase<br/><small>citizen_reports (RLS: anon insert-only)</small>"]
+    FIN --> SUP["Supabase<br/><small>citizen_reports (RLS: anon insert-only)</small>"]
     SUP --> SYNC["sync_supabase.py<br/><small>→ data/outputs/</small>"]
-    SYNC --> ATT["🔍 attribute<br/><small>matches by ward + evidence window</small>"]
+    SYNC --> ATT["attribute<br/><small>matches by ward + evidence window</small>"]
     ATT --> EV["Evidence chain<br/><small>“1 citizen report of waste_burning”<br/>confidence 0.77 → 0.84</small>"]
 
     classDef llm fill:#a9760a22,stroke:#a9760a;
@@ -285,6 +320,12 @@ flowchart LR
 deterministic math. The lift is **capped**: a brigade of reports can never
 manufacture a source or out-shout the satellite. Reports outside the evidence
 window, or that match no real ward, correctly do **not** corroborate.
+
+> **Honest footnote.** That lift was demonstrated live, and it is **not present in
+> the shipped Delhi data** — 0 of 53 attributions carry citizen corroboration. The
+> reports are from today; the Delhi case study is a November 2025 window. Citizens
+> cannot report into a historical window, and we will not widen the evidence window
+> to manufacture a match. It is a live capability shown on a historical case.
 
 The same bot carries the **inspector loop** — an inspector replies `done <id>`, the
 status is written back, and the ledger stamps the response time. Two audiences, one
@@ -302,17 +343,20 @@ Because a README that oversells is the same bug as a metric that oversells.
 | H3 spatial fabric + real ward boundaries | ✅ real (official Datameet GeoJSON for Bengaluru/Delhi/Chennai; Voronoi fallback) |
 | Detection (NO₂ contrast + fire persistence) | ✅ real — validated on a real landfill fire |
 | Attribution + evidence chain + confidence | ✅ real, truth-scored, calibrated |
-| Forecast — 24/48/72 h vs persistence baseline | ✅ real. Gradient boosting; **27–28% RMSE skill vs persistence** on synthetic. On real Delhi the *direction* is the finding: persistence wins ≤24 h, the model wins 72 h (the enforcement-scheduling window) |
+| Forecast — 3-hourly to +72 h vs persistence baseline | ✅ real. One pooled LightGBM with the lead time as a feature, scored at **24 lead times** on a held-out tail. See [the sawtooth](#the-evaluation-was-flattering-our-own-baseline) — and the city where we lose |
 | Prioritisation (EPS) + dispatch routing | ✅ real — deterministic score, greedy set-cover, per-team routes |
 | Enforcement memo + rule-matched legal basis | ✅ real — deterministic legal citation, LLM drafts prose only |
-| Ward advisory agent — Kannada/Hindi/Tamil/English | ✅ real, with **per-language verification labels** (native-speaker vs cross-checked — never claims a review it didn't get) |
+| Ward advisory agent — English + city language | ✅ real — **every ward, not a sample**: Delhi 267 wards in en/hi, Chennai 177 in en/ta, Bengaluru 227 in en/kn, with per-language verification labels (native-speaker vs cross-checked — never claims a review it didn't get) |
 | Intervention ledger — response time + counterfactual | ✅ real. Response-time is honest (CAG's *weeks* vs one automated batch); effectiveness freezes the +48 h counterfactual, `our_impact: null` until a real intervention exists |
 | Channels — n8n citizen intake + inspector loop | ✅ **live.** Telegram bot + web webhook → Supabase, proven end-to-end into the evidence chain |
-| Read-only serving API (20+ endpoints) | ✅ real |
+| Read-only serving API (23 endpoints) | ✅ real |
 | **Fusion exposure field** | ❌ **claim withdrawn.** On real Delhi it is **14% worse than a naive city-mean** (RMSE 75.4 vs 66.0). We tried predicting the *deviation* from the city median — a construction that cannot lose to the baseline — and it still lost, which means the spatial model has **no transferable skill** across held-out stations. We do not claim it. |
-| **Frontend — React + Leaflet console** | 🔨 **in progress.** API + JSON contracts are real; the map/queue UI is the active build. Screenshots below once it lands. |
+| **Frontend — Next.js + deck.gl console** | ✅ **deployed.** Admin console and citizen view live on Vercel, reading the live API with a static-bundle fallback so the map still renders if the backend is down |
 | GEE Sentinel-5P collector | ✅ **built and wired** — real `COPERNICUS/S5P` extraction; it produced the real Delhi result. Live satellite needs GEE auth on the run machine (`gcloud auth application-default login`); until then synthetic mode runs fully offline |
-| Voice advisory **audio** (TTS) | 🔨 text + voice mapping on `main`; audio synthesis on `feature/voice-advisories`, pending a native-speaker listen before merge |
+| **Intervention effectiveness** | ❌ **not claimed.** The ledger freezes the +48 h counterfactual at dispatch and waits for a real actioned outcome. Zero of four actions are actioned, so `our_impact` is `null`. Response *time* is real; response *effect* is not yet measurable |
+| Voice advisory **audio** (TTS) | ✅ real — Google TTS, 71 clips per city, played in the citizen view and pushed as Telegram voice notes |
+| Network audit — monitoring blind spots | ✅ real — **21 of 1,703 Delhi cells are monitored**; the 40 worst blind spots are ranked into a next-sensor placement list |
+| Multi-city — one instance, three cities | ✅ real — `?city=` on every endpoint; Delhi, Chennai and Bengaluru all run the same pipeline |
 
 > ### ⚠️ Live mode refuses to fake anything
 > If the satellite, fire, or OSM collector fails, the pipeline **raises rather than
@@ -331,22 +375,25 @@ Because a README that oversells is the same bug as a metric that oversells.
 
 ## See it running
 
-> 🖼️ **Screenshots land here once the frontend ships.** Placeholders name the shot
-> so the story reads even before the images are attached.
+It is deployed. These are live, not screenshots.
 
 | | |
 |---|---|
-| **Admin console — the map** | _`docs/img/console-map.png`_ · fusion choropleth + hotspot zones + fires, with the layer toggles and the +72 h forecast time-slider |
-| **Action Queue → evidence chain** | _`docs/img/evidence-chain.png`_ · an EPS-ranked card expanded to *"why this hotspot"* — the inspectable evidence, including citizen corroboration |
-| **One-click enforcement memo** | _`docs/img/memo.png`_ · the dispatch-ready notice with its rule-matched legal citation |
-| **Citizen bot, live** | _`docs/img/telegram-loop.png`_ · a Hinglish report in, `ward: BHALSWA · waste_burning` out — the shot below is real today |
-| **Live agent progress (SSE)** | _`docs/img/agent-strip.png`_ · the seven agents streaming *running → completed* during a pipeline run |
+| **Admin console** | [aircase-aq.vercel.app/admin](https://aircase-aq.vercel.app/admin) — map, hotspot zones, evidence chains, EPS queue, dispatch routes, agent runner |
+| **Citizen view** | [aircase-aq.vercel.app/citizen](https://aircase-aq.vercel.app/citizen) — your ward's AQI, *why* it is bad, what is being done, and a 3-hourly timeline |
+| **API** | [/docs](https://aircase-api-431151205852.asia-south1.run.app/docs) — 23 endpoints, `?city=` on each, OpenAPI schema |
+| **Health** | [/health](https://aircase-api-431151205852.asia-south1.run.app/health) — which cities this instance can answer for |
 
-The Telegram loop is already demonstrable end-to-end:
+The console runs the agent chain live: pick an agent (or all nine), set the
+inspection-team count, and watch dispatch recluster. Everything read-only falls
+back to a committed static bundle, so the map still renders if the backend is
+down.
+
+The Telegram loop is demonstrable end-to-end:
 
 ```
 Citizen:  Bhalswa mein kachra jal raha hai
-AQIntel:  Report received - ward: BHALSWA, category: waste_burning.
+AirCase:  Report received - ward: BHALSWA, category: waste_burning.
           If it corroborates an inspection you will hear back here.
 ```
 
@@ -387,16 +434,17 @@ assumption we made.
 ## Repo layout
 
 ```
-app/            backend/main.py — read-only FastAPI (20+ contracts)
-                frontend/       — React + Vite + Leaflet console (in progress)
+app/            backend/main.py — read-only FastAPI (23 endpoints, ?city= scoped)
+                frontend/       — Next.js + deck.gl console + citizen view
 ingestion/      collectors (6 sources, live + synthetic fallback)
                 preprocessing/panel.py — the cell × hour feature table
                 synthetic.py — the adversarial hidden-source world
-intelligence/   orchestrator.py     — the 7-agent LangGraph state machine
+intelligence/   orchestrator.py     — the 9-agent LangGraph state machine
                 models/fusion.py    — LightGBM exposure field
                 models/signals.py   — robust multi-window statistics
                 agents/             — detect, attribution, forecast, prioritise,
-                                      memo, advisory, ledger + llm_gateway
+                                      memo, advisory, voice, ledger, audit
+                                      + llm_gateway
 shared/         config, H3 grid utilities, real ward layer (3 cities)
 scripts/        run_pipeline.py, sync_supabase.py + truth-scored evaluations
 db/             schema.sql — Supabase contracts the channel layer writes to
@@ -417,25 +465,28 @@ python scripts/eval_hotspot_recovery.py     # fusion as an EXPOSURE map — and 
 
 ## Roadmap
 
-**Done since the first draft** ✅ Sentinel-5P collector via Google Earth Engine
-(built and wired — it produced the real Delhi result) · 7-agent LangGraph pipeline
-(detect → attribute → forecast → prioritise → memo → advise → ledger) · real
-Datameet ward boundaries for three cities · n8n citizen intake + inspector loop,
-live and proven into the evidence chain · multi-language advisory *text* with honest
-per-language verification labels.
+**Shipped.** Sentinel-5P via Google Earth Engine · 9-agent LangGraph pipeline ·
+real Datameet ward boundaries for three cities · n8n citizen intake and inspector
+loop, proven end-to-end into the evidence chain · multi-language advisory text and
+voice · Next.js console and citizen view on Vercel · read-only API and live agent
+runs on Cloud Run, serving all three cities from one instance.
 
-**Landing now — built on feature branches, merging to `main`:**
+**Known gaps, stated rather than hidden:**
 
-- [ ] **Frontend** (`feature/frontend-app`) — React + Leaflet console + citizen view; typed API client with static-JSON fallback; memo/report buttons already call `POST /memo/{id}` and `POST /reports`. Merge + smoke-test against the live API.
-- [ ] **Voice advisories** (`feature/voice-advisories`) — the advisory *text* + Google-TTS voice mapping ship on `main`; the **audio synthesis** and `/voice` endpoint are on the branch, pending a native-speaker listen before merge.
-
-**Genuinely still ahead:**
-
-- [ ] **Live satellite needs GEE auth on the run machine** — the collector is done; `gcloud auth application-default login` (see `docs/gcp-setup.md`) is the one manual step. Until then, synthetic mode runs fully offline.
-- [ ] Sentinel-2 optical change detection → close the construction blind spot (S5P never will)
-- [ ] Kannada advisory text is `cross_checked`, not native-verified — ten minutes with a Kannada speaker upgrades it
-
----
+- [ ] **Construction dust is invisible to us** — recall 0/3. It is coarse PM with
+      no satellite tracer and it does not burn. Closing it needs Sentinel-2 optical
+      change detection, the OSM permit layer, and citizen reports at volume.
+- [ ] **Traffic corridors are confounded** — recall 0/4. The road network lifts NO₂
+      across the whole core, so a corridor cannot out-shout its own neighbourhood.
+- [ ] **Citizen corroboration has never fired on the shipped data.** The path works
+      and is proven — a Bhalswa report resolves to the right ward and lifts
+      confidence — but the reports are from today and the Delhi case study is
+      November 2025. Citizens cannot report into a historical window.
+- [ ] **Intervention effectiveness is unmeasured.** The counterfactual is frozen at
+      dispatch; it needs a real actioned inspection to become an impact number.
+- [ ] **No rate limiting on the public report webhook.** It is an unauthenticated
+      intake form by design; abuse handling is not built.
+- [ ] Kannada advisory text is `cross_checked`, not native-verified.
 
 ## Contributors
 
