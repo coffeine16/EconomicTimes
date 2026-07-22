@@ -28,40 +28,46 @@ names them with an inspectable evidence chain, and reports honestly on what it
 **cannot** see.
 
 <p align="center">
-  <img src="./docs/img/console-map.png" alt="AirCase admin console: a Delhi hotspot zone selected, showing its attributed source, evidence chain and EPS breakdown beside the map" width="100%" />
+  <img src="./docs/img/console-map.png" alt="AirCase enforcement console: a Delhi hotspot zone selected, showing its attributed source, evidence chain, EPS breakdown and a routed inspection" width="100%" />
 </p>
 
 <p align="center">
   <sub><b>The enforcement console.</b> A chronic zone in KAPASHERA, attributed to
-  traffic, with the deterministic score, the evidence behind it, the EPS breakdown,
-  and a one-click memo. Every layer on the left is a real instrument.</sub>
+  traffic, with the deterministic score, the evidence behind it, the EPS
+  breakdown, a routed inspection and a one-click memo. Every layer on the left is
+  a real instrument.</sub>
 </p>
 
 <p align="center">
-  <img src="./docs/img/citizen-ward.png" alt="AirCase citizen view for MUNIRKA ward: AQI 404 Severe, a why-your-air-is-like-this panel, and a statement that the reading is a model estimate" width="45%" />
-  &nbsp;&nbsp;
-  <img src="./docs/img/citizen-forecast.png" alt="AirCase citizen view on mobile: nearest monitor distance, the ward advisory, and a 3-hourly forecast naming the cleanest and worst hours" width="45%" />
+  <img src="./docs/img/citizen-ward.png" alt="AirCase citizen view for PERAGHARHI: AQI 403 Severe, with a panel explaining that no source was attributed here" width="31%" />
+  &nbsp;
+  <img src="./docs/img/citizen-forecast.png" alt="Same ward scrolled: the nearest monitor is 6.7 km away, the advisory, and a 3-hourly forecast naming the cleanest and worst hours" width="31%" />
+  &nbsp;
+  <img src="./docs/img/citizen-report.png" alt="The citizen report form: pollution type, optional photo, optional description" width="31%" />
 </p>
 
 <p align="center">
-  <sub><b>The same platform, facing the citizen.</b> AQI 404 is the number every
-  app shows. The panels under it are the ones nobody else does.</sub>
+  <sub><b>The same platform, facing the citizen.</b> AQI 403 is the number every
+  app shows. The three panels under it are the ones nobody else does.</sub>
 </p>
 
-**Why your air is like this.** In this ward it says *no source was attributed* —
-because none was. Our instruments found nothing standing out here, and the panel
-says so rather than inventing a cause. Where a source *is* found, its evidence
-chain appears in the same place.
+**Why your air is like this.** Here it says *no source was attributed in your
+ward* — because none was. Our instruments found nothing standing out, and the
+panel says so rather than inventing a cause. Where a source *is* found, its
+evidence chain appears in the same place.
 
-**How much to trust this number.** Left: a model estimate for the ward, not a
-measurement at the doorstep. Right, a different ward: *the nearest government
-monitor is 0.8 km away, so this reading is anchored to a real instrument.* The
-claim changes with the evidence, because most of the city has no monitor within
-kilometres and a product that hides that is selling certainty it does not have.
+**How much to trust this number.** *"The nearest government monitor is 6.7 km
+away. There is no sensor in your ward, so this number is an estimate built from
+satellite data, weather and local land use — not a measurement. Most of this city
+has no monitor; showing you a number without saying so would be the dishonest
+part."* Where a monitor **is** close, the same panel says so instead. The claim
+tracks the evidence.
 
-**When to go outside.** Cleanest around 10am at AQI 268, worst around 4pm at 376
-— from the 3-hourly forecast. The swing across a single day is larger than the
-change from one day to the next, which is exactly what a 24-hour forecast hides.
+**When to go outside, and how to talk back.** Cleanest around 10am at AQI 271,
+worst around 7pm at 383 — the swing across one day is larger than the change from
+one day to the next, which is exactly what a 24-hour forecast hides. And the
+report form turns a resident into the one instrument that sees construction dust,
+which no satellite can.
 
 ---
 
@@ -327,6 +333,16 @@ human sensors"* — and, uniquely, the only instrument that can see the construc
 dust the satellite is blind to. The intake is a live Telegram bot (and a web form
 against the same endpoint), deployed on n8n behind automatic HTTPS.
 
+<p align="center">
+  <img src="./docs/img/citizen-find-ward.png" alt="AirCase citizen entry: citywide AQI, search by ward name, use my location, or tap the map" width="34%" />
+</p>
+
+<p align="center">
+  <sub>A citizen never types a ward ID. Search by name, share location, or tap the
+  hexagon they are standing in — and the citywide number is there before they
+  pick, so the page is useful on the first screen.</sub>
+</p>
+
 ```mermaid
 flowchart LR
     U["Citizen<br/><small>“Bhalswa mein kachra<br/>jal raha hai”</small>"] --> TG["Telegram / web form"]
@@ -390,6 +406,18 @@ Because a README that oversells is the same bug as a metric that oversells.
 | **Frontend — Next.js + deck.gl console** | ✅ **deployed.** Admin console and citizen view live on Vercel, reading the live API with a static-bundle fallback so the map still renders if the backend is down |
 | GEE Sentinel-5P collector | ✅ **built and wired** — real `COPERNICUS/S5P` extraction; it produced the real Delhi result. Live satellite needs GEE auth on the run machine (`gcloud auth application-default login`); until then synthetic mode runs fully offline |
 | **Intervention effectiveness** | ❌ **not claimed.** The ledger freezes the +48 h counterfactual at dispatch and waits for a real actioned outcome. Zero of four actions are actioned, so `our_impact` is `null`. Response *time* is real; response *effect* is not yet measurable |
+
+<p align="center">
+  <img src="./docs/img/ledger.png" alt="AirCase intervention ledger: response time marked measured, effectiveness marked not yet measured, with the reason stated" width="62%" />
+</p>
+
+<p align="center">
+  <sub>The ledger keeps those two apart on purpose. <b>Response time: measured.</b>
+  <b>Effectiveness: not yet measured</b> — "nobody has acted on these yet, so we do
+  not claim an impact number; attributing natural change to ourselves would be
+  dishonest." A product that reported an impact here would be easy to build and
+  impossible to defend.</sub>
+</p>
 | Voice advisory **audio** (TTS) | ✅ real — Google TTS, 71 clips per city, played in the citizen view and pushed as Telegram voice notes |
 | Network audit — monitoring blind spots | ✅ real — **21 of 1,703 Delhi cells are monitored**; the 40 worst blind spots are ranked into a next-sensor placement list |
 | Multi-city — one instance, three cities | ✅ real — `?city=` on every endpoint; Delhi, Chennai and Bengaluru all run the same pipeline |
@@ -424,6 +452,17 @@ The console runs the agent chain live: pick an agent (or all nine), set the
 inspection-team count, and watch dispatch recluster. Everything read-only falls
 back to a committed static bundle, so the map still renders if the backend is
 down.
+
+<p align="center">
+  <img src="./docs/img/chennai-zones.png" alt="AirCase console switched to Chennai: twelve enforcement zones in the queue, a different coastline, the same pipeline" width="100%" />
+</p>
+
+<p align="center">
+  <sub><b>Same code, different city.</b> Chennai: twelve enforcement zones, on a
+  satellite feed only 26% complete and three CPCB stations for eleven million
+  people. No new hardware, no city-specific code — a bounding box and a ward
+  layer.</sub>
+</p>
 
 The Telegram loop closes in both directions, in the citizen's own language and
 in their own medium:
