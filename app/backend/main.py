@@ -18,13 +18,28 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from shared.config import DATA_OUT, DATA_RAW
 
-app = FastAPI(title="AQ Intelligence Platform API", version="0.1")
+app = FastAPI(
+    title="AirCase API",
+    version="0.2",
+    description=(
+        "Read-only serving layer over the batch pipeline's precomputed contracts.\n\n"
+        "**Multi-city.** One instance serves every city whose pipeline has run. "
+        "Pass `?city=` on any endpoint to choose; omit it for the instance "
+        "default. `GET /health` lists which cities this instance can actually "
+        "answer for. An unknown city returns 400; a city with no pipeline output "
+        "returns 404 naming the fix — never another city's data.\n\n"
+        "**Heavy compute is not here.** Ingestion, the panel build and fusion "
+        "training run offline in batch. `POST /run/agent` executes the 9-agent "
+        "chain over artifacts those stages already produced, which is why it "
+        "fits inside a request."
+    ),
+)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # Voice advisories (MP3) are static files written by the batch pipeline.
@@ -41,6 +56,7 @@ app.mount("/audio", StaticFiles(directory=str(DATA_OUT / "audio")), name="audio"
 # request into a ContextVar and the path helpers read it. Endpoints stay unchanged
 # and CANNOT accidentally read the wrong city, because they no longer name one.
 from contextvars import ContextVar  # noqa: E402
+from typing import Literal  # noqa: E402
 from shared.config import CITIES, CITY, DATA_OUT_BASE, DATA_RAW_BASE  # noqa: E402
 
 _req_city: ContextVar[str] = ContextVar("req_city", default=CITY)
@@ -57,6 +73,39 @@ async def _city_scope(request, call_next):
         return await call_next(request)
     finally:
         _req_city.reset(token)
+
+
+def city_param(
+    city: str | None = Query(
+        default=None,
+        # An ENUM in the schema so /docs renders a dropdown, but the annotation
+        # stays `str`. Declaring it as a Literal made FastAPI validate before the
+        # middleware ran, and `?city=DELHI` — which the middleware has always
+        # accepted, since it lowercases — started returning 422. Documenting a
+        # parameter must not narrow what it accepts.
+        json_schema_extra={"enum": sorted(CITIES)},
+        description=(
+            "Which city to serve. Every contract is stored per city and this "
+            "selects among them. Omit to use the instance default "
+            f"({CITY}). Available: {', '.join(sorted(CITIES))}."
+        ),
+        examples=[CITY],
+    ),
+) -> str:
+    """DECLARED so the parameter is visible, not just functional.
+
+    The middleware above already resolves ?city= for every request, and that is
+    what the path helpers read. But FastAPI builds /docs and /openapi.json from
+    function SIGNATURES, and no endpoint named `city` — so the schema advertised
+    `parameters: NONE` on all 23 routes and the API looked single-city to anyone
+    reading its documentation. Two reviewers read it that way.
+
+    Declaring it as a dependency on every route puts it in the schema (with an
+    enum, so /docs renders a dropdown) without moving the resolution logic out of
+    the middleware. An API that works but does not document its main capability
+    is indistinguishable, to a reader, from one that lacks it.
+    """
+    return _req_city.get()
 
 
 def _city() -> str:
@@ -87,7 +136,7 @@ def _json(name: str):
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-@app.get("/health")
+@app.get("/health", dependencies=[Depends(city_param)])
 def health():
     """Liveness + WHICH CITY this instance actually serves.
 
@@ -108,18 +157,18 @@ def health():
     }
 
 
-@app.get("/hotspots")
+@app.get("/hotspots", dependencies=[Depends(city_param)])
 def hotspots():
     return _json("hotspots.json")
 
 
-@app.get("/attributions")
+@app.get("/attributions", dependencies=[Depends(city_param)])
 def attributions():
     return [{k: a[k] for k in ("cell", "ward_id", "ts", "primary_source", "confidence", "reason")}
             for a in _json("attributions.json")]
 
 
-@app.get("/wards")
+@app.get("/wards", dependencies=[Depends(city_param)])
 def wards():
     """cell -> ward map, as WRITTEN BY THE PIPELINE.
 
@@ -131,7 +180,7 @@ def wards():
     return _json("wards.json")
 
 
-@app.get("/attribution/{cell}")
+@app.get("/attribution/{cell}", dependencies=[Depends(city_param)])
 def attribution(cell: str):
     for a in _json("attributions.json"):
         if a["cell"] == cell:
@@ -139,7 +188,7 @@ def attribution(cell: str):
     raise HTTPException(404, f"no attribution for cell {cell}")
 
 
-@app.get("/fusion")
+@app.get("/fusion", dependencies=[Depends(city_param)])
 def fusion(hour_offset: int = 0):
     p = _city_out() / "fusion_field.parquet"
     if not p.exists():
@@ -159,12 +208,12 @@ def fusion(hour_offset: int = 0):
                       for r in snap.itertuples()]}
 
 
-@app.get("/loso")
+@app.get("/loso", dependencies=[Depends(city_param)])
 def loso():
     return _json("loso.json")
 
 
-@app.get("/stations")
+@app.get("/stations", dependencies=[Depends(city_param)])
 def stations():
     """CAAQMS station locations + their latest reading. Feeds the map's station markers."""
     p = _city_raw() / "stations.parquet"
@@ -184,7 +233,7 @@ def stations():
             for r in latest.itertuples()]
 
 
-@app.get("/satellite")
+@app.get("/satellite", dependencies=[Depends(city_param)])
 def satellite():
     """Per-cell Sentinel-5P NO2 tropospheric column (median over the window).
 
@@ -204,7 +253,7 @@ def satellite():
             for cell, v in per_cell.items()]
 
 
-@app.get("/forecast")
+@app.get("/forecast", dependencies=[Depends(city_param)])
 def forecast(h: int | None = None):
     """PM2.5 forecast per cell. ?h=24|48|72 filters to one horizon; omit for all.
 
@@ -216,13 +265,13 @@ def forecast(h: int | None = None):
     return field
 
 
-@app.get("/forecast/eval")
+@app.get("/forecast/eval", dependencies=[Depends(city_param)])
 def forecast_eval():
     """RMSE at each horizon vs persistence + diurnal baselines. The rubric's number."""
     return _json("forecast_eval.json")
 
 
-@app.get("/voice/{ward_id}")
+@app.get("/voice/{ward_id}", dependencies=[Depends(city_param)])
 def voice(ward_id: str, lang: str = "en"):
     """Audio path for a ward's advisory in `lang`, plus how the TEXT was verified.
 
@@ -242,13 +291,13 @@ def voice(ward_id: str, lang: str = "en"):
     raise HTTPException(404, f"no {lang} audio for ward {ward_id}")
 
 
-@app.get("/advisories")
+@app.get("/advisories", dependencies=[Depends(city_param)])
 def advisories():
     """Ward health advisories, ranked by risk. Multi-language."""
     return _json("advisories.json")
 
 
-@app.get("/ward/{ward_id}/summary")
+@app.get("/ward/{ward_id}/summary", dependencies=[Depends(city_param)])
 def ward_summary(ward_id: str):
     """The citizen view: my ward's air, my forecast, my advisory in my language."""
     for a in _json("advisories.json"):
@@ -257,7 +306,7 @@ def ward_summary(ward_id: str):
     raise HTTPException(404, f"no advisory for ward {ward_id}")
 
 
-@app.post("/run/agent")
+@app.post("/run/agent", dependencies=[Depends(city_param)])
 def run_agent(body: dict):
     """Execute the agent chain (or one agent) via the LangGraph orchestrator.
 
@@ -311,20 +360,20 @@ def run_agent(body: dict):
         return json.loads(out.read_text(encoding="utf-8"))
 
 
-@app.get("/ledger")
+@app.get("/ledger", dependencies=[Depends(city_param)])
 def ledger():
     """Intervention ledger: response-time reduction (real) + frozen counterfactuals
     awaiting real outcomes. See intelligence/agents/ledger.py for the honesty split."""
     return _json("ledger.json")
 
 
-@app.get("/memos")
+@app.get("/memos", dependencies=[Depends(city_param)])
 def memos():
     """All drafted enforcement memos (the EPS queue turned into documents)."""
     return _json("memos.json")
 
 
-@app.get("/memo/{action_id}")
+@app.get("/memo/{action_id}", dependencies=[Depends(city_param)])
 def memo(action_id: str):
     """One memo, with its evidence chain and its legal basis.
 
@@ -339,7 +388,7 @@ def memo(action_id: str):
     raise HTTPException(404, f"no memo for {action_id}")
 
 
-@app.get("/fires")
+@app.get("/fires", dependencies=[Depends(city_param)])
 def fires():
     """FIRMS thermal detections in the window. The instrument that finds burning
     sources directly — and the one that located Bhalswa."""
@@ -355,11 +404,11 @@ def fires():
              "ts": str(r.ts)}
             for r in df.sort_values("ts").itertuples()]
 
-@app.get("/actions")
+@app.get("/actions", dependencies=[Depends(city_param)])
 def actions():
     """Ranked enforceable hotspots."""
     return _json("actions.json")
-@app.get("/dispatch")
+@app.get("/dispatch", dependencies=[Depends(city_param)])
 def dispatch():
     """Team routes for maximum-coverage dispatch."""
     return _json("dispatch.json")
@@ -372,7 +421,7 @@ def compare():
     if not p.exists():
         return []
     return json.loads(p.read_text(encoding="utf-8"))
-@app.get("/audit")
+@app.get("/audit", dependencies=[Depends(city_param)])
 def audit():
     """Monitoring network audit (F4): blind spots (dirty unmonitored cells ->
     next-sensor placement) + sensor flags. Empty envelope until the pipeline runs."""
