@@ -37,29 +37,31 @@ names them with an inspectable evidence chain, and reports honestly on what it
   and a one-click memo. Every layer on the left is a real instrument.</sub>
 </p>
 
-<table>
-<tr>
-<td width="46%" valign="top">
-  <img src="./docs/img/citizen-ward.png" alt="AirCase citizen view for MUNIRKA ward: AQI 404 Severe, a section explaining why, and a statement that the reading is a model estimate" width="100%" />
-</td>
-<td valign="top">
+<p align="center">
+  <img src="./docs/img/citizen-ward.png" alt="AirCase citizen view for MUNIRKA ward: AQI 404 Severe, a why-your-air-is-like-this panel, and a statement that the reading is a model estimate" width="45%" />
+  &nbsp;&nbsp;
+  <img src="./docs/img/citizen-forecast.png" alt="AirCase citizen view on mobile: nearest monitor distance, the ward advisory, and a 3-hourly forecast naming the cleanest and worst hours" width="45%" />
+</p>
 
-**The same platform, facing the citizen.**
+<p align="center">
+  <sub><b>The same platform, facing the citizen.</b> AQI 404 is the number every
+  app shows. The panels under it are the ones nobody else does.</sub>
+</p>
 
-AQI 404, Severe — the number every app shows. Then the two nobody else does:
+**Why your air is like this.** In this ward it says *no source was attributed* —
+because none was. Our instruments found nothing standing out here, and the panel
+says so rather than inventing a cause. Where a source *is* found, its evidence
+chain appears in the same place.
 
-**Why your air is like this.** Here it says *no source was attributed in this
-ward* — because none was. Our instruments found nothing standing out, and the
-panel says so rather than inventing a cause. Where a source *is* found, this is
-where its evidence chain appears.
+**How much to trust this number.** Left: a model estimate for the ward, not a
+measurement at the doorstep. Right, a different ward: *the nearest government
+monitor is 0.8 km away, so this reading is anchored to a real instrument.* The
+claim changes with the evidence, because most of the city has no monitor within
+kilometres and a product that hides that is selling certainty it does not have.
 
-**How much to trust this number.** It is a model estimate for the ward, not a
-measurement at the doorstep. Most of the city has no monitor within kilometres,
-and a product that hides that is selling certainty it does not have.
-
-</td>
-</tr>
-</table>
+**When to go outside.** Cleanest around 10am at AQI 268, worst around 4pm at 376
+— from the 3-hourly forecast. The swing across a single day is larger than the
+change from one day to the next, which is exactly what a 24-hour forecast hides.
 
 ---
 
@@ -423,13 +425,18 @@ inspection-team count, and watch dispatch recluster. Everything read-only falls
 back to a committed static bundle, so the map still renders if the backend is
 down.
 
-The Telegram loop is demonstrable end-to-end:
+The Telegram loop closes in both directions, in the citizen's own language and
+in their own medium:
 
-```
-Citizen:  Bhalswa mein kachra jal raha hai
-AirCase:  Report received - ward: BHALSWA, category: waste_burning.
-          If it corroborates an inspection you will hear back here.
-```
+<p align="center">
+  <img src="./docs/img/telegram-voice-loop.png" alt="Telegram: a voice note in Hinglish is transcribed, logged as ward DELHI CANTT CHARGE 1 category waste_burning, and answered with a Hindi audio advisory" width="62%" />
+</p>
+
+A **spoken** report — *"Delhi Cant, Charj 1 mein kachra jal raha hai"* — is
+transcribed, the ward is canonicalised against the official list (`Charj 1` →
+`DELHI CANTT CHARGE 1`), the category is clamped to `waste_burning`, and the
+ward's advisory comes back **as audio**. No typing, no app, no literacy
+requirement. The people most exposed to this air are outdoor workers.
 
 ---
 
