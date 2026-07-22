@@ -175,9 +175,17 @@ export interface DispatchRoute {
 
 export interface ForecastCell {
   cell: string;
-  horizon_h: number;      // 24 | 48 | 72
+  horizon_h: number;      // 3-hourly: 3, 6, ... 72
   pm25_hat: number;
   urgency: boolean;       // worsening met conditions
+}
+
+/** One ward, one lead time. The citizen timeline's unit. */
+export interface WardForecastPoint {
+  ward_id: string;
+  horizon_h: number;      // 3-hourly: 3, 6, ... 72
+  pm25_hat: number;       // MEDIAN across the ward's cells
+  n_cells: number;
 }
 
 // ─── Ledger ───────────────────────────────────────────────────────────────────

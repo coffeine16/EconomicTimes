@@ -25,6 +25,9 @@ JSON_CONTRACTS = [
     "hotspots.json", "attributions.json", "actions.json", "dispatch.json",
     "ledger.json", "audit.json", "wards.json", "forecast.json", "memos.json",
     "advisories.json",
+    # Ward-level 3-hourly series behind the citizen timeline. Without this the
+    # timeline silently renders nothing — cityFetch returns its empty fallback.
+    "forecast_ward.json",
     # Validation surfaces — the numbers the brief is scored on. Shipping them
     # makes the rigour visible in the product instead of only in a slide.
     "forecast_eval.json", "loso.json", "source_health.json",

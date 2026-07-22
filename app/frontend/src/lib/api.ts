@@ -114,6 +114,7 @@ import type {
   LedgerEntry,
   Ledger,
   ForecastCell,
+  WardForecastPoint,
   Action,
   DispatchRoute,
   CitizenReport,
@@ -137,6 +138,12 @@ export const api = {
   cityAudit:      (city: string) => cityFetch<AuditResponse>(city, "audit.json", { blind_spots: [], sensor_flags: [], placement_recommendations: [] }),
   cityDispatch:   (city: string) => cityFetch<DispatchRoute[]>(city, "dispatch.json", []),
   cityActions:    (city: string) => cityFetch<Action[]>(city, "actions.json", []),
+  /** Ward-level 3-hourly forecast (24 lead times to +72h), for the citizen
+   *  timeline. Ward-scale and medianed, so it is ~1% the size of the cell grid —
+   *  the phone downloads kilobytes, not megabytes. */
+  cityWardForecast: (city: string) =>
+    cityFetch<WardForecastPoint[]>(city, "forecast_ward.json", []),
+
   cityForecast:   (city: string, h: 24 | 48 | 72) =>
     cityFetch<ForecastCell[]>(city, "forecast.json", []).then((all) => all.filter((f) => f.horizon_h === h)),
   cityAttributions: (city: string) => cityFetch<Attribution[]>(city, "attributions.json", []),

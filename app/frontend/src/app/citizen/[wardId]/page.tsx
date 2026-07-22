@@ -11,6 +11,7 @@ import type { FusionResponse, ForecastCell } from "@/lib/types";
 
 import VoiceAdvisory from "@/components/citizen/VoiceAdvisory";
 import WardAccountability from "@/components/citizen/WardAccountability";
+import WardTimeline from "@/components/citizen/WardTimeline";
 import { icon, ArrowLeft, ArrowRight, Camera, ClipboardList, Megaphone, TrendingUp } from "@/components/Icon";
 
 const CitizenMap = dynamic(() => import("@/components/citizen/CitizenMap"), {
@@ -199,6 +200,12 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
 
       {/* Spoken advisory — the IVR/voice-note deliverable, per language */}
       <VoiceAdvisory city={city} wardId={wardId} />
+
+      {/* 3-hourly ward timeline. Leads the forecast section because the diurnal
+          swing (BHALSWA: 240 at night, 109 by midday) is larger than the
+          day-to-day change, and the four-box strip below samples only 24-hour
+          multiples — which all land on the same hour of day and hide it. */}
+      <WardTimeline city={city} wardId={wardId} />
 
       {/* 72-hour forecast — median predicted AQI across the ward's cells */}
       <div className="card" style={{ marginBottom: "var(--space-lg)" }}>
