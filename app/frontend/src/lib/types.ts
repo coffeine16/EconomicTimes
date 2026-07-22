@@ -432,6 +432,8 @@ export interface MapFilters {
   persistence_types: HotspotKind[];
   attributable_only: boolean;
   date?: string;
-  forecast_horizon: 0 | 24 | 48 | 72;
+  /** Hours ahead: 0 (live fusion field), else 3..72 in steps of 3.
+   *  Was `0 | 24 | 48 | 72` when the agent produced only three horizons. */
+  forecast_horizon: number;
   satellite_channel: SatelliteChannel;
 }

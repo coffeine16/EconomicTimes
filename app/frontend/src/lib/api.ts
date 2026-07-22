@@ -144,7 +144,8 @@ export const api = {
   cityWardForecast: (city: string) =>
     cityFetch<WardForecastPoint[]>(city, "forecast_ward.json", []),
 
-  cityForecast:   (city: string, h: 24 | 48 | 72) =>
+  /** `h` is a lead time in hours: 3..72 in steps of 3 (was 24|48|72 only). */
+  cityForecast:   (city: string, h: number) =>
     cityFetch<ForecastCell[]>(city, "forecast.json", []).then((all) => all.filter((f) => f.horizon_h === h)),
   cityAttributions: (city: string) => cityFetch<Attribution[]>(city, "attributions.json", []),
   cityMemos:      (city: string) => cityFetch<Memo[]>(city, "memos.json", []),

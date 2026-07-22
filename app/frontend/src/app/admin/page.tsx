@@ -81,12 +81,16 @@ export default function AdminPage() {
   const wardCells = wardsResp?.cells ?? [];
   const blindSpots = audit?.blind_spots ?? [];
 
-  // Forecast horizon: 0 = the live fusion field, 24/48/72 = the forecast agent's
-  // predicted PM2.5 for that horizon. The choropleth switches between them, so the
-  // time control actually drives the map (it used to be a dead control).
+  // Forecast horizon: 0 = the live fusion field, else a 3-hourly lead (3..72) from
+  // the forecast agent. The choropleth switches between them, so the time control
+  // actually drives the map (it used to be a dead control).
+  //
+  // 3-hourly matters here: at 24-hour steps every sample lands on the SAME hour of
+  // day, so scrubbing showed four near-identical maps and the diurnal swing — the
+  // largest thing moving — was invisible between them.
   const { data: horizonForecast } = useSWR(
     hourOffset > 0 ? [city, "forecast", hourOffset] : null,
-    () => api.cityForecast(city, hourOffset as 24 | 48 | 72)
+    () => api.cityForecast(city, hourOffset)
   );
   const wardOf = useMemo(() => {
     const m = new Map<string, string>();

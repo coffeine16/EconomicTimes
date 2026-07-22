@@ -201,38 +201,12 @@ export default function WardDashboardPage({ params }: { params: Promise<Params> 
       {/* Spoken advisory — the IVR/voice-note deliverable, per language */}
       <VoiceAdvisory city={city} wardId={wardId} />
 
-      {/* 3-hourly ward timeline. Leads the forecast section because the diurnal
-          swing (BHALSWA: 240 at night, 109 by midday) is larger than the
-          day-to-day change, and the four-box strip below samples only 24-hour
-          multiples — which all land on the same hour of day and hide it. */}
+      {/* Forecast: the 3-hourly ward timeline, and nothing else.
+          It REPLACED a Now/+24/+48/+72 strip that sat right underneath it. The
+          strip was strictly contained by the curve, and worse, its four samples
+          all land on the same hour of day — so it hid the diurnal swing that is
+          the largest thing moving (BHALSWA: 240 at night, 109 by midday). */}
       <WardTimeline city={city} wardId={wardId} />
-
-      {/* 72-hour forecast — median predicted AQI across the ward's cells */}
-      <div className="card" style={{ marginBottom: "var(--space-lg)" }}>
-        <h5 style={{ marginBottom: "var(--space-md)" }}>72-hour forecast</h5>
-        <div style={{ display: "flex", gap: "var(--space-sm)" }}>
-          {forecast.map((f) => {
-            const cat = f.aqi != null ? getAqiCategory(f.aqi) : null;
-            return (
-              <div
-                key={f.label}
-                style={{
-                  flex: 1, textAlign: "center", padding: "12px 4px",
-                  borderRadius: "var(--radius-md)",
-                  background: "var(--bg-tertiary)",
-                  borderTop: `2px solid ${cat ? cat.color : "var(--border-default)"}`,
-                }}
-              >
-                <div style={{ fontSize: "0.7rem", color: "var(--text-tertiary)", marginBottom: 6 }}>{f.label}</div>
-                <div className="mono" style={{ fontSize: "1.35rem", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1 }}>
-                  {f.aqi ?? "—"}
-                </div>
-                <div style={{ fontSize: "0.62rem", color: "var(--text-tertiary)", marginTop: 5 }}>{cat?.label ?? ""}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
       {/* Actions */}
       <div style={{ display: "flex", gap: "var(--space-md)", flexWrap: "wrap" }}>

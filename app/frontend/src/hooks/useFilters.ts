@@ -22,7 +22,7 @@ type FilterAction =
   | { type: "SET_PERSISTENCE"; payload: HotspotKind[] }
   | { type: "SET_ATTRIBUTABLE"; payload: boolean }
   | { type: "SET_DATE"; payload: string | undefined }
-  | { type: "SET_HORIZON"; payload: 0 | 24 | 48 | 72 }
+  | { type: "SET_HORIZON"; payload: number }   // 0, else 3..72 step 3
   | { type: "SET_SAT_CHANNEL"; payload: SatelliteChannel }
   | { type: "RESET" };
 
@@ -70,7 +70,7 @@ export function useFilters() {
     dispatchFilter({ type: "SET_ATTRIBUTABLE", payload: v }), []);
   const setDate = useCallback((d: string | undefined) =>
     dispatchFilter({ type: "SET_DATE", payload: d }), []);
-  const setHorizon = useCallback((h: 0 | 24 | 48 | 72) =>
+  const setHorizon = useCallback((h: number) =>
     dispatchFilter({ type: "SET_HORIZON", payload: h }), []);
   const setSatChannel = useCallback((c: SatelliteChannel) =>
     dispatchFilter({ type: "SET_SAT_CHANNEL", payload: c }), []);
