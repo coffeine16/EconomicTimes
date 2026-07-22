@@ -31,6 +31,12 @@ interface Validation {
 }
 interface ForecastEval { [h: string]: { rmse_model: number; rmse_persistence: number; skill_vs_persistence_pct: number } }
 interface Loso { overall: { rmse: number; r2: number; n_stations: number; naive_citymean_rmse: number } }
+interface SourceRow {
+  source: string; cadence: string; observed: string;
+  completeness_pct: number | null; if_stale: string;
+  load_bearing_for_detection: boolean;
+}
+interface SourceHealth { claim: string; why: string[]; honest_limit: string; sources: SourceRow[] }
 
 const j = async <T,>(u: string, fb: T): Promise<T> => {
   try { const r = await fetch(u); return r.ok ? await r.json() : fb; } catch { return fb; }
@@ -54,6 +60,8 @@ export default function ValidationPage() {
     for (const c of CITIES) out[c.id] = await j(`/data/${c.id}/forecast_eval.json`, {} as ForecastEval);
     return out;
   });
+  const { data: sh } = useSWR<SourceHealth | null>([city, "source-health"], () =>
+    j(`/data/${city}/source_health.json`, null));
   const { data: lo } = useSWR<Record<string, Loso | null>>(["loso-all"], async () => {
     const out: Record<string, Loso | null> = {};
     for (const c of CITIES) out[c.id] = await j(`/data/${c.id}/loso.json`, null);
@@ -199,11 +207,63 @@ export default function ValidationPage() {
         </Section>
       )}
 
+      {/* ── Source resilience: what survives when a feed lags ───────────────── */}
+      {sh && (
+        <Section
+          title="Data resilience"
+          sub={sh.claim + " Sources update asynchronously — stations drop out, the satellite sees through cloud two days in three, fires are event-driven. Here is what each one actually delivers, and what still works when it lags."}
+        >
+          <div className="card" style={{ padding: 0, overflow: "hidden", marginBottom: "var(--space-md)" }}>
+            <div className="scroll-x">
+              <table className="data-table" style={{ minWidth: 640 }}>
+                <thead>
+                  <tr>
+                    <th>Source</th><th>Cadence</th>
+                    <th style={{ textAlign: "right" }}>Complete</th>
+                    <th>If it goes stale</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sh.sources.map((s) => (
+                    <tr key={s.source}>
+                      <td style={{ color: "var(--text-primary)", whiteSpace: "nowrap" }}>
+                        {s.source}
+                        {s.load_bearing_for_detection && (
+                          <span className="badge badge-critical" style={{ marginLeft: 6 }}>detection</span>
+                        )}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>{s.cadence}</td>
+                      <td className="num">
+                        {s.completeness_pct == null ? "—" : `${s.completeness_pct}%`}
+                      </td>
+                      <td style={{ whiteSpace: "normal", maxWidth: 380, fontSize: "0.78rem" }}>{s.if_stale}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gap: "var(--space-sm)" }}>
+            {sh.why.map((w: string, i: number) => (
+              <div key={i} className="card card-rail" style={{ ["--rail" as string]: "var(--positive)",
+                fontSize: "0.83rem", lineHeight: 1.55, color: "var(--text-secondary)" }}>
+                {w}
+              </div>
+            ))}
+            <div className="card card-rail" style={{ ["--rail" as string]: "var(--caution)",
+              fontSize: "0.83rem", lineHeight: 1.55, color: "var(--text-secondary)" }}>
+              <strong>The limit of that redundancy: </strong>{sh.honest_limit}
+            </div>
+          </div>
+        </Section>
+      )}
+
       {/* ── The caveats. The most important section. ────────────────────────── */}
       {v && (
         <Section title="What these numbers do NOT mean" sub="Every claim above, qualified by us before anyone else has to.">
           <div style={{ display: "grid", gap: "var(--space-sm)" }}>
-            {v.caveats.map((c, i) => (
+            {v.caveats.map((c: string, i: number) => (
               <div key={i} className="card card-rail" style={{ ["--rail" as string]: "var(--caution)", fontSize: "0.84rem", lineHeight: 1.6, color: "var(--text-secondary)" }}>
                 {c}
               </div>
